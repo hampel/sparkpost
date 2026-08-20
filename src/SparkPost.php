@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hampel\SparkPost;
 
+use Hampel\SparkPost\Resource\MessageEvents;
 use Hampel\SparkPost\Resource\Transmissions;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
@@ -26,6 +27,8 @@ final class SparkPost
 
     private ?Transmissions $transmissions = null;
 
+    private ?MessageEvents $messageEvents = null;
+
     public function __construct(
         private readonly Config $config,
         ClientInterface $client,
@@ -44,6 +47,11 @@ final class SparkPost
     public function transmissions(): Transmissions
     {
         return $this->transmissions ??= new Transmissions($this->connection, $this->logger);
+    }
+
+    public function messageEvents(): MessageEvents
+    {
+        return $this->messageEvents ??= new MessageEvents($this->connection, $this->logger);
     }
 
     /**

@@ -100,6 +100,68 @@ Transmission::make()->to('alice@example.com')->template('welcome');
 Transmission::make()->to('alice@example.com')->abTest('subject-line');
 ```
 
+## Message events
+
+```php
+use Hampel\SparkPost\MessageEvent\EventQuery;
+use Hampel\SparkPost\MessageEvent\EventType;
+
+$query = EventQuery::make()
+    ->events(EventType::Bounce, EventType::SpamComplaint, EventType::ListUnsubscribe)
+    ->from(new DateTimeImmutable('-1 day'))
+    ->to(new DateTimeImmutable())
+    ->perPage(100);
+
+foreach ($sparkpost->messageEvents()->each($query) as $event) {
+    // one event at a time, across as many pages as it takes
+}
+```
+
+`each()` is lazy — a page is only fetched once the previous one has been consumed, so
+stopping early stops making requests. `from` and `to` are converted to UTC, which is what
+the API assumes when no timezone is given.
+
+### Picking the work up again later
+
+There are usually more events than one request has time to collect, so the position in a
+search is a **cursor that casts to a string**. Store it wherever a string can go, and
+resume in the next run:
+
+```php
+$page = $sparkpost->messageEvents()->search($query);
+
+process($page->results);
+
+if ($page->hasMore()) {
+    $job->data['cursor'] = (string) $page->next();   // and stop here
+}
+```
+
+```php
+// ... a request, a job, or an hour later
+$page = $sparkpost->messageEvents()->next(EventCursor::fromString($job->data['cursor']));
+```
+
+A page reports `$page->totalCount`, counts, and iterates. Events themselves are plain
+arrays: their shape varies a great deal by event type, and pinning it down would mean
+either a type that hides most of the payload or twenty of them.
+
+### Bounce classes
+
+SparkPost reports why a message bounced as a numeric class. What to *do* about each one is
+your policy, but the codes and what they mean are SparkPost's:
+
+```php
+use Hampel\SparkPost\MessageEvent\BounceClass;
+
+// note the cast: SparkPost sends bounce_class as a string, and may add codes later
+$class = BounceClass::tryFrom((int) ($event['bounce_class'] ?? 0));
+
+$class?->classification();                 // Hard, Soft, Block, Admin, Undetermined
+$class?->classification()->isPermanent();  // whether to stop sending to this address
+$class?->slug();                           // 'invalid_recipient'
+```
+
 ## HTTP 200 does not mean the mail was sent
 
 SparkPost returns `200` having accepted zero recipients, so the status code alone will tell
