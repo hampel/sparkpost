@@ -75,6 +75,15 @@ final class Config
         return $uri;
     }
 
+    /**
+     * The host the client will talk to, for anything that needs to name the endpoint - a
+     * transport's __toString(), a log line, a settings screen.
+     */
+    public function host(): string
+    {
+        return parse_url($this->baseUri, PHP_URL_HOST) ?: self::DEFAULT_HOST;
+    }
+
     private static function hostUri(string $host): string
     {
         return sprintf('https://%s/%s', $host, self::API_PREFIX);

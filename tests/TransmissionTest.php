@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Hampel\SparkPost\Tests;
 
 use Hampel\SparkPost\Exception\InvalidArgumentException;
+use Hampel\SparkPost\Transmission\Address;
 use Hampel\SparkPost\Transmission\Transmission;
 use PHPUnit\Framework\TestCase;
 
@@ -155,5 +156,37 @@ final class TransmissionTest extends TestCase
         $payload = $this->minimal()->header('MESSAGE-ID', 'x')->header('Content-Type', 'x')->header('X-Keep', 'y')->toArray();
 
         $this->assertSame(['X-Keep' => 'y'], self::path($payload, 'content.headers'));
+    }
+    public function test_deliver_to_replaces_the_recipients_but_not_the_headers(): void
+    {
+        $payload = Transmission::make()
+            ->from('webmaster@example.com')
+            ->subject('Hi')
+            ->text('Body.')
+            ->to('alice@example.com', 'Alice')
+            ->cc('bob@example.com', 'Bob')
+            ->deliverTo([new Address('sink@example.test')])
+            ->toArray();
+
+        // delivery goes to the sink alone
+        $this->assertSame(
+            [['address' => ['email' => 'sink@example.test', 'header_to' => 'Alice <alice@example.com>']]],
+            self::path($payload, 'recipients')
+        );
+
+        // but the message still reads as though it were addressed normally
+        $this->assertSame('Bob <bob@example.com>', self::path($payload, 'content.headers.CC'));
+    }
+
+    public function test_deliver_to_alone_satisfies_the_recipient_requirement(): void
+    {
+        $payload = Transmission::make()
+            ->from('webmaster@example.com')
+            ->subject('Hi')
+            ->text('Body.')
+            ->deliverTo([new Address('sink@example.test')])
+            ->toArray();
+
+        $this->assertSame([['address' => ['email' => 'sink@example.test']]], self::path($payload, 'recipients'));
     }
 }

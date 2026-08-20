@@ -108,6 +108,9 @@ final class Transmission
     /** @var array<string, mixed>|null */
     private ?array $rawContent = null;
 
+    /** @var list<Address>|null */
+    private ?array $deliverTo = null;
+
     public static function make(): self
     {
         return new self();
@@ -158,6 +161,24 @@ final class Transmission
     public function bcc(string $email, string $name = ''): self
     {
         $this->bcc[] = new Address($email, $name);
+
+        return $this;
+    }
+
+    /**
+     * Deliver to these addresses instead of the ones in to()/cc()/bcc(), leaving the
+     * To: and CC: headers exactly as those built them.
+     *
+     * This is the seam an envelope override needs. A mail framework lets a listener
+     * rewrite where a message is actually delivered - to a sink address while testing, to
+     * a single inbox on a staging site - without touching the headers the recipient sees.
+     * SparkPost keeps those two things in separate places, and this is the one.
+     *
+     * @param  list<Address>  $addresses
+     */
+    public function deliverTo(array $addresses): self
+    {
+        $this->deliverTo = $addresses;
 
         return $this;
     }
@@ -308,7 +329,7 @@ final class Transmission
      */
     public function toArray(): array
     {
-        if ($this->to === [] && $this->cc === [] && $this->bcc === []) {
+        if ($this->deliverTo === null && $this->to === [] && $this->cc === [] && $this->bcc === []) {
             throw new InvalidArgumentException('A transmission needs at least one recipient.');
         }
 
@@ -358,7 +379,7 @@ final class Transmission
 
         $recipients = [];
 
-        foreach ([...$this->to, ...$this->cc, ...$this->bcc] as $address) {
+        foreach ($this->deliverTo ?? [...$this->to, ...$this->cc, ...$this->bcc] as $address) {
             $recipients[] = ['address' => $headerTo === ''
                 ? $address->toArray()
                 : ['email' => $address->email, 'header_to' => $headerTo]];

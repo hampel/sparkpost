@@ -27,13 +27,18 @@ final class SparkPost
     private ?Transmissions $transmissions = null;
 
     public function __construct(
-        Config $config,
+        private readonly Config $config,
         ClientInterface $client,
         RequestFactoryInterface $requestFactory,
         StreamFactoryInterface $streamFactory,
         private readonly LoggerInterface $logger = new NullLogger(),
     ) {
-        $this->connection = new Connection($config, $client, $requestFactory, $streamFactory, $this->logger);
+        $this->connection = new Connection($this->config, $client, $requestFactory, $streamFactory, $this->logger);
+    }
+
+    public function config(): Config
+    {
+        return $this->config;
     }
 
     public function transmissions(): Transmissions
