@@ -86,6 +86,30 @@ distinguishes client from server errors still catches it.
 that can answer on that URL — a proxy or gateway will return HTML — so `json_decode()` returning
 `null`, and a JSON body with no `errors` key, are both expected inputs, not edge cases.
 
+## The Transmission builder, and why the fixtures matter
+
+`Transmission` builds the payload. Most of its value is not the obvious fields but five
+rules that are easy to get wrong and produce mail that looks fine until someone reads the
+headers — `header_to` on every recipient, the `CC` header being what makes Cc visible,
+the disallowed-header list, `false` surviving the prune, and sandbox auto-detection. Each
+is commented where it is implemented.
+
+**Those rules were worked out by the WordPress plugin first**, and
+`tests/fixtures/wordpress-plugin/*.json` is that plugin's real output — captured by
+`tests/fixtures/wordpress-plugin/capture.php`, which loads
+`includes/class-mailer.php` verbatim outside WordPress with WordPress stubbed, and calls
+the private `build_transmission()` by reflection. Nothing is retyped, so the fixtures
+cannot drift from what the plugin does.
+
+`TransmissionParityTest` asserts with `assertSame`, which compares key order too. That is
+stricter than SparkPost needs, deliberately: it means a change to the payload shape fails
+loudly rather than passing as "equivalent". If the plugin changes, re-run `capture.php`
+rather than editing the JSON.
+
+**`prune()` is not `array_filter()`.** The default callback drops `false` and `0`, which
+would turn `open_tracking => false` into "use the account default" — a bug the package
+this replaces actually had. Keep the explicit callback.
+
 ### HTTP 200 is not a successful send
 
 SparkPost returns 200 having accepted zero recipients. `TransmissionResult::wasAccepted()` is the

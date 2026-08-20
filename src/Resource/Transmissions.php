@@ -6,6 +6,7 @@ namespace Hampel\SparkPost\Resource;
 
 use Hampel\SparkPost\Connection;
 use Hampel\SparkPost\Result\TransmissionResult;
+use Hampel\SparkPost\Transmission\Transmission;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
@@ -27,10 +28,12 @@ final class Transmissions
      * counts as failure is the caller's policy. A mail transport should treat
      * wasAccepted() === false as a failed send; a bulk job may well not.
      *
-     * @param  array<mixed>  $transmission
+     * @param  Transmission|array<mixed>  $transmission
      */
-    public function send(array $transmission): TransmissionResult
+    public function send(Transmission|array $transmission): TransmissionResult
     {
+        $transmission = $transmission instanceof Transmission ? $transmission->toArray() : $transmission;
+
         $this->logger->debug('SparkPost transmission', self::redact($transmission));
 
         return TransmissionResult::fromResponse($this->connection->post('transmissions', $transmission));

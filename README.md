@@ -24,22 +24,20 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\HttpFactory;
 use Hampel\SparkPost\Config;
 use Hampel\SparkPost\SparkPost;
+use Hampel\SparkPost\Transmission\Transmission;
 
 $guzzle  = new Client();
 $factory = new HttpFactory();   // PSR-17, fills both the request and stream roles
 
 $sparkpost = new SparkPost(new Config('MY-API-KEY'), $guzzle, $factory, $factory);
 
-$result = $sparkpost->transmissions()->send([
-    'recipients' => [
-        ['address' => ['email' => 'me@example.com']],
-    ],
-    'content' => [
-        'from'    => ['email' => 'webmaster@example.com'],
-        'subject' => 'Hello',
-        'text'    => 'Hello from SparkPost.',
-    ],
-]);
+$result = $sparkpost->transmissions()->send(
+    Transmission::make()
+        ->from('webmaster@example.com', 'Webmaster')
+        ->subject('Hello')
+        ->text('Hello from SparkPost.')
+        ->to('me@example.com', 'Me')
+);
 ```
 
 For the EU tenancy, or any other region:
@@ -50,6 +48,57 @@ $sparkpost = new SparkPost(Config::forRegion('MY-API-KEY', 'eu'), $guzzle, $fact
 
 A PSR-3 logger is optional and takes a fifth argument. Requests are logged at `debug`,
 failures at `error`; attachment payloads are truncated before they reach the log.
+
+## Building a transmission
+
+`send()` takes a `Transmission`, or a plain array if you would rather build the payload
+yourself.
+
+```php
+use Hampel\SparkPost\Transmission\Attachment;
+use Hampel\SparkPost\Transmission\Transmission;
+
+$transmission = Transmission::make()
+    ->from('webmaster@example.com', 'Webmaster')
+    ->subject('Your invoice')
+    ->html('<p>Attached. Also see <img src="cid:logo"></p>')
+    ->text('Attached.')
+    ->to('alice@example.com', 'Alice')
+    ->cc('accounts@example.com', 'Accounts')
+    ->bcc('archive@example.com')
+    ->replyTo('billing@example.com')
+    ->header('X-Campaign', 'invoices')
+    ->attach(Attachment::fromPath('/tmp/invoice.pdf', 'invoice.pdf', 'application/pdf'))
+    ->attach(Attachment::inline('logo', 'image/png', $logoBytes))
+    ->transactional()
+    ->openTracking(false)
+    ->campaignId('invoices')
+    ->metadata(['user_id' => 7])
+    ->substitutionData(['first_name' => 'Alice']);
+```
+
+Most of that is obvious. These parts are not, and are the reason the builder exists:
+
+- **SparkPost sends one message per recipient**, so without a `header_to` every recipient
+  sees a `To:` line containing only themselves. The builder sets it on every recipient
+  from your `to()` list, which is what reproduces ordinary mail.
+- **Cc is made visible by a `CC` header**, not by the recipient list — the recipients are
+  how the mail is addressed, the header is how it is displayed. Bcc gets no header, which
+  is what makes it blind.
+- **A dozen headers are rejected** if you pass them in `content.headers`, because
+  SparkPost derives them from the transmission itself. `header()` drops those rather than
+  letting the API reject the whole send.
+- **`false` survives.** An option set to `false` is sent as `false`, not dropped as empty
+  — `openTracking(false)` means "do not track opens", not "use the account default".
+- **Mail from `@sparkpostbox.com`** switches the `sandbox` option on by itself, because
+  that domain silently fails without it. `sandbox(false)` overrides.
+
+Stored templates and A/B tests replace the content entirely:
+
+```php
+Transmission::make()->to('alice@example.com')->template('welcome');
+Transmission::make()->to('alice@example.com')->abTest('subject-line');
+```
 
 ## HTTP 200 does not mean the mail was sent
 

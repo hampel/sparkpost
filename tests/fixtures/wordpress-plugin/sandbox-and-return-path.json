@@ -1,0 +1,24 @@
+{
+    "options": {
+        "open_tracking": true,
+        "click_tracking": true,
+        "transactional": false,
+        "sandbox": true
+    },
+    "recipients": [
+        {
+            "address": {
+                "email": "alice@example.com",
+                "header_to": "Alice <alice@example.com>"
+            }
+        }
+    ],
+    "content": {
+        "from": {
+            "email": "test@SparkPostBox.com"
+        },
+        "subject": "Hello",
+        "text": "Body."
+    },
+    "return_path": "bounces@example.com"
+}

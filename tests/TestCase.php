@@ -13,6 +13,8 @@ use Psr\Log\NullLogger;
 
 abstract class TestCase extends BaseTestCase
 {
+    use InspectsPayloads;
+
     protected StubClient $client;
 
     protected function setUp(): void
@@ -34,31 +36,6 @@ abstract class TestCase extends BaseTestCase
             $logger ?? new NullLogger()
         );
     }
-    /**
-     * Reach into a decoded structure by dotted path.
-     *
-     * Every nested read into a decoded JSON body or a log context is an offset access on
-     * mixed, which PHPStan rejects at level 10 - correctly, since nothing guarantees the
-     * shape. This keeps the assertions readable and gives them one place to be honest
-     * about that: a path that is not there comes back null and the assertion fails.
-     *
-     * @param  array<mixed>|null  $data
-     */
-    protected static function path(?array $data, string $path): mixed
-    {
-        $value = $data;
-
-        foreach (explode('.', $path) as $segment) {
-            if (!is_array($value) || !array_key_exists($segment, $value)) {
-                return null;
-            }
-
-            $value = $value[$segment];
-        }
-
-        return $value;
-    }
-
     /**
      * The body of the last request the stub client was given, decoded.
      *

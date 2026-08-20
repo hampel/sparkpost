@@ -21,6 +21,7 @@ use GuzzleHttp\Psr7\HttpFactory;
 use Hampel\SparkPost\Config;
 use Hampel\SparkPost\Exception\ExceptionInterface;
 use Hampel\SparkPost\SparkPost;
+use Hampel\SparkPost\Transmission\Transmission;
 
 $io->title('sparkpost · send');
 
@@ -50,24 +51,19 @@ $io->value('from', $from);
 $io->value('to', $to);
 $io->line();
 
-$transmission = [
-    'options' => [
-        'transactional' => true,
-        'open_tracking' => false,
-        'click_tracking' => false,
-        // The sandbox domain will not send without this, and a verified domain ignores it.
-        'sandbox' => str_ends_with(strtolower($from), '@sparkpostbox.com'),
-    ],
-    'recipients' => [
-        ['address' => ['email' => $to]],
-    ],
-    'content' => [
-        'from' => ['email' => $from, 'name' => 'Rig'],
-        'subject' => 'hampel/sparkpost · rig send',
-        'text' => "Sent by vendor/bin/rig send.\n\nIf you are reading this, the transmissions resource works.",
-        'html' => '<p>Sent by <code>vendor/bin/rig send</code>.</p><p>If you are reading this, the transmissions resource works.</p>',
-    ],
-];
+$transmission = Transmission::make()
+    ->from($from, 'Rig')
+    ->to($to)
+    ->subject('hampel/sparkpost · rig send')
+    ->text("Sent by vendor/bin/rig send.\n\nIf you are reading this, the transmissions resource works.")
+    ->html('<p>Sent by <code>vendor/bin/rig send</code>.</p><p>If you are reading this, the transmissions resource works.</p>')
+    ->transactional()
+    ->openTracking(false)
+    ->clickTracking(false);
+
+// The sandbox domain is switched on by the builder itself - show what that produced.
+$io->value('payload', $transmission->toArray()['options'] ?? []);
+$io->line();
 
 try {
     $result = $sparkpost->transmissions()->send($transmission);

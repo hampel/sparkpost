@@ -1,0 +1,26 @@
+{
+    "options": {
+        "open_tracking": false,
+        "click_tracking": false,
+        "transactional": true
+    },
+    "recipients": [
+        {
+            "address": {
+                "email": "alice@example.com",
+                "header_to": "Alice <alice@example.com>"
+            }
+        }
+    ],
+    "content": {
+        "from": {
+            "email": "webmaster@example.com"
+        },
+        "subject": "Hello",
+        "text": "Body.",
+        "reply_to": "Reply Desk <reply@example.com>, second@example.com",
+        "headers": {
+            "X-Campaign": "spring"
+        }
+    }
+}

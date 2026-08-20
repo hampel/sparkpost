@@ -1,0 +1,36 @@
+{
+    "options": {
+        "open_tracking": false,
+        "click_tracking": false,
+        "transactional": true
+    },
+    "recipients": [
+        {
+            "address": {
+                "email": "alice@example.com",
+                "header_to": "Alice <alice@example.com>"
+            }
+        }
+    ],
+    "content": {
+        "from": {
+            "email": "webmaster@example.com"
+        },
+        "subject": "Hello",
+        "html": "<p>See <img src=\"cid:0\"></p>",
+        "attachments": [
+            {
+                "name": "invoice.pdf",
+                "type": "application/pdf",
+                "data": "SU5WT0lDRS1CWVRFUw=="
+            }
+        ],
+        "inline_images": [
+            {
+                "name": "0",
+                "type": "image/png",
+                "data": "TE9HTy1CWVRFUw=="
+            }
+        ]
+    }
+}
