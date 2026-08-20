@@ -120,6 +120,33 @@ success and ignored the body, so a rejected send looked identical to a delivered
 whether that counts as failure is the caller's policy. `hampel/sparkpost-transport` is where
 `wasAccepted() === false` becomes a thrown `TransportException`.
 
+## Message events, and why the cursor is a string
+
+Paging is the substance of this resource, not a detail of it, because the two callers are
+genuinely different. A script that runs to completion wants `each()`, which walks every page
+lazily — stop early and it stops making requests. A queue job cannot run to completion at all, so
+it needs somewhere to keep its place between runs.
+
+That is why `EventCursor` is a string and nothing more: a job stores `(string) $page->next()` in
+its own state and comes back with `EventCursor::fromString()`. **`Config::resolve()` is what makes
+that work unchanged** — the URI SparkPost returns already carries the `/api/v1` prefix that the
+base URI ends with, so it can go straight back in without the stripping every consumer of this API
+has written by hand. Do not "tidy" that branch out of `resolve()`; it is load-bearing here.
+
+`each()` stops, and says so on the logger, if SparkPost hands back a link pointing at the page it
+came from. Cheap insurance against a hang whose cause is outside our control.
+
+**Events stay plain arrays.** Their shape varies enormously by event type, and pinning it down
+means either a lowest-common-denominator type that hides most of the payload, or twenty types.
+
+`BounceClass` and `EventType` are enums because the codes and their meanings are SparkPost's own.
+What an application *does* about each one — disable the account, stop one kind of email, ignore it
+— is that application's policy and belongs to it. Resist requests to put that here.
+
+`from` and `to` are converted to UTC rather than formatted as they stand: SparkPost's datetime
+format carries no offset, so otherwise the same query means different things depending on where
+the server runs.
+
 ## Tests
 
 `tests/StubClient.php` is a PSR-18 client that answers from a queue and records requests, so the
