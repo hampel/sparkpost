@@ -18,10 +18,11 @@ here may depend on `symfony/mailer`** — that boundary is the reason the packag
 composer install
 composer check                                  # lint, analyse, test - what CI runs
 composer test                                   # phpunit
-composer analyse                                # phpstan, levels below
+composer analyse                                # phpstan, level 10 - see Version support
 composer format                                 # pint, PSR-12
 vendor/bin/phpunit --filter test_name           # one test
 vendor/bin/phpunit tests/ConfigTest.php         # one file
+vendor/bin/rig                                  # the live-API exercises, below
 ```
 
 ## The PSR-18 seam is the whole design
@@ -54,6 +55,12 @@ signature-incompatible `LoggerInterface` on the autoloader. The same reasoning a
 `psr/http-message` (`^1.1|^2.0`; XF ships 2.0). Check what XenForo bundles in
 `/srv/www/xenforo23.local/src/vendor/composer/installed.json` before widening or narrowing either.
 
+**`tests/RecordingLogger.php` declares `log()` without parameter types on purpose**, and that is
+the same constraint reaching into the test suite: `psr/log` 1.1 declares `log()` untyped while
+`psr/log` 3 declares `string|\Stringable $message`, and an untyped parameter is wider than both, so
+one class satisfies every version the package supports. Adding the types "for tidiness" compiles
+fine here and breaks the `--prefer-lowest` corner in CI — which is the XenForo corner.
+
 ## Architecture
 
 - `SparkPost` — entry point and resource factory. Builds one `Connection` and memoises resources.
@@ -61,7 +68,9 @@ signature-incompatible `LoggerInterface` on the autoloader. The same reasoning a
   pagination links get handled: they come back already carrying the `/api/v1/` prefix that `baseUri`
   ends with, so the prefix is stripped here rather than at each call site.
 - `Connection` — request building, sending, decoding, and the single place a failed response becomes
-  an exception.
+  an exception. `SparkPost::connection()` exposes its `get()` and `post()` deliberately, so an
+  endpoint with no `Resource` yet is a call away rather than a release away. `composer.json`
+  advertises suppression and nothing wraps it — that is the gap this hatch covers meanwhile.
 - `Resource/*` — one class per API area, taking and returning plain data.
 - `Result/*` — typed results where the shape is worth pinning down.
 - `Exception/*` — see below.
@@ -154,7 +163,38 @@ suite needs no network and no Guzzle mock handler. Guzzle is a dev dependency on
 objects. Any new resource gets tested through the stub — if a test needs the network, the design is
 wrong.
 
+The rest of the suite's scaffolding, none of it incidental:
+
+- `TestCase` — the base class; builds a `StubClient` per test and wires a `SparkPost` around it.
+- `TransportFailure` — throws `NetworkExceptionInterface`, which is the only way to exercise the
+  `RequestException` path: a PSR-18 client never throws on a status code.
+- `InspectsPayloads` — dotted-path reads into a built payload or a decoded body. It exists because
+  PHPStan runs at level 10, where every nested read on `mixed` is an error; the trait is the one
+  place that admits nothing guarantees the shape, and a missing path fails the assertion.
+- `RecordingLogger` — see the untyped `log()` note above before touching it.
+
 Namespace is `Hampel\SparkPost\Tests\`, filename suffix `Test.php`.
+
+## Exercising against the real API
+
+`harness/` holds three `hampel/rig` exercises. They are not tests and assert nothing — they exist
+for the questions a stub structurally cannot answer.
+
+```bash
+cp .env.example .env                 # SPARKPOST_API_KEY, _TO, _FROM, optional _REGION
+vendor/bin/rig                       # list them
+vendor/bin/rig send                  # one real transmission, and what came back
+vendor/bin/rig events                # real paging, real event shapes
+vendor/bin/rig errors                # needs no key - every call here is meant to fail
+```
+
+`send` and `events` answer the only thing worth knowing before a release: whether SparkPost accepts
+the payload `Transmission` builds, and whether its pagination links come back in the shape
+`EventCursor` expects. `errors` needs no credentials — an invalid key gets a real 401 or 403, and an
+unroutable host produces a genuine `RequestException`.
+
+`.env` and `.env.*` are gitignored with `!.env.example`; `harness/` is `export-ignore`d, along with
+`tests/`, `CLAUDE.md` and the tooling config, so none of it ships in the Packagist archive.
 
 ## Version support
 
@@ -163,7 +203,19 @@ whole 8.3–8.5 range in one pass (`phpVersion` in `phpstan.neon`). Keep that ra
 `php` constraint in `composer.json`. Widening or narrowing either is a policy decision, not a
 judgement call.
 
+PHPStan runs at **level 10** over both `src` and `tests`, excluding
+`tests/fixtures/wordpress-plugin/capture.php` — that file redeclares WordPress on purpose, and the
+suite reads its output rather than its code.
+
+CI runs the corners of the range rather than the whole matrix: 8.3 with `--prefer-lowest`, 8.3
+current, and 8.5. PHPStan runs in each of those jobs and not only in one of its own, because
+`phpVersion` covers the PHP axis wherever it runs but the result still depends on the dependency
+tree resolved against — PHPStan's own version included, which is what the `--prefer-lowest` corner
+is for.
+
 ## Releases
 
-`CHANGELOG.md` is hand-maintained, newest first, `x.y.z (YYYY-MM-DD)` heading with bullet points, and
-is updated in its own commit before tagging. Simon does his own pushes and tagging.
+`CHANGELOG.md` is hand-maintained, newest first, and updated in its own commit before tagging.
+Headings are setext-underlined rather than `##` — `x.y.z (YYYY-MM-DD)` over a row of dashes, matching
+the `Unreleased` section already there — with bullet points below. Simon does his own pushes and
+tagging.
