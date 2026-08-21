@@ -204,8 +204,11 @@ unroutable host produces a genuine `RequestException`.
 
 `SPARKPOST_RETURN_PATH` is what exercises the envelope FROM, and it is there because bounce handling
 and DMARC are decided somewhere no test can reach. The envelope address takes the bounces and is
-what SPF authenticates; the header From is what DMARC aligns against; SparkPost refuses a bounce
-domain the account has not verified. `send` prints `return_path` from the built payload rather than
+what SPF authenticates; the header From is what DMARC aligns against; and **SparkPost accepting the
+transmission proves nothing about either** — a return path on a domain nobody owns was accepted, 200
+with one recipient, on 21 August 2026. Do not restore a claim that an unverified bounce domain is
+refused; it was in these files, it was never tested, and it is contradicted by the only evidence
+anyone has gathered. `send` prints `return_path` from the built payload rather than
 from the variable — it is a top-level field, and putting it under `options` instead is a mistake the
 API accepts in silence. `events` then prints `msg_from` whenever it differs from `friendly_from`,
 which is the same envelope address as SparkPost recorded it.

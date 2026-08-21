@@ -15,10 +15,10 @@
  * suite cannot settle. It is a different address from the header From, and the difference
  * is the whole point: the envelope address is where bounces are delivered and what the
  * receiver runs SPF against, while the header From is what the reader sees and what DMARC
- * aligns against. A bounce domain that is not verified on the account is refused by
- * SparkPost, and one that is verified but not aligned passes SPF and still fails DMARC -
- * neither of which any amount of unit testing can tell you, because both verdicts are
- * reached on somebody else's mail server.
+ * aligns against. Neither verdict is reached here: SparkPost accepts a return path on a
+ * domain it has no reason to trust, and a domain that is verified but not aligned passes
+ * SPF and still fails DMARC. Both are decided on somebody else's mail server, which is
+ * exactly why this is an exercise rather than a test.
  *
  * Needs SPARKPOST_API_KEY, SPARKPOST_TO, SPARKPOST_FROM. SPARKPOST_RETURN_PATH is optional.
  *
@@ -111,8 +111,13 @@ if ($result->wasAccepted()) {
 
 if ($returnPath !== null) {
     $io->line();
-    $io->info('SparkPost took the return path, which only means the bounce domain is verified.');
-    $io->info('Whether it works is decided at the far end - read the delivered message:');
+    // Acceptance proves nothing about the bounce domain. Observed 21 August 2026 from the
+    // sparkpost-transport harness: a send with return_path on a domain nobody here owns
+    // came back 200 with 1 accepted. Whatever SparkPost validates at transmission time, it
+    // is not that the domain is verified on the account.
+    $io->info('SparkPost took the return path. That is not proof the domain is verified -');
+    $io->info('an unverified one is accepted too. It is decided at the far end, so read the');
+    $io->info('delivered message:');
     $io->line('  Return-Path:                 the envelope address, and where a bounce would go');
     $io->line('  Authentication-Results: spf  authenticates the envelope domain, not the From');
     $io->line('  Authentication-Results: dmarc  passes only if one of SPF or DKIM aligns with From');
