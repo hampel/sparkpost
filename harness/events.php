@@ -74,6 +74,17 @@ foreach ($page as $event) {
     $class = BounceClass::tryFrom((int) ($event['bounce_class'] ?? 0));
     $detail = $class === null ? '' : sprintf(' [%s / %s]', $class->slug(), $class->classification()->value);
 
+    // SparkPost records both senders: friendly_from is the header From the reader sees,
+    // msg_from is the envelope address bounces are delivered to and SPF authenticates.
+    // They differ whenever a return path is in play, which is the normal case for a
+    // bounce domain - so show the envelope only when it is not the obvious one.
+    $from = is_string($event['friendly_from'] ?? null) ? $event['friendly_from'] : null;
+    $envelope = is_string($event['msg_from'] ?? null) ? $event['msg_from'] : null;
+
+    if ($envelope !== null && strcasecmp($envelope, (string) $from) !== 0) {
+        $detail .= sprintf(' <%s>', $envelope);
+    }
+
     $io->line(sprintf('  %-22s %s%s', $type, $rcpt, $detail));
 }
 

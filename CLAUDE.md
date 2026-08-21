@@ -181,7 +181,7 @@ Namespace is `Hampel\SparkPost\Tests\`, filename suffix `Test.php`.
 for the questions a stub structurally cannot answer.
 
 ```bash
-cp .env.example .env                 # SPARKPOST_API_KEY, _TO, _FROM, optional _REGION
+cp .env.example .env                 # _API_KEY, _TO, _FROM; optional _RETURN_PATH, _REGION
 vendor/bin/rig                       # list them
 vendor/bin/rig send                  # one real transmission, and what came back
 vendor/bin/rig events                # real paging, real event shapes
@@ -192,6 +192,18 @@ vendor/bin/rig errors                # needs no key - every call here is meant t
 the payload `Transmission` builds, and whether its pagination links come back in the shape
 `EventCursor` expects. `errors` needs no credentials — an invalid key gets a real 401 or 403, and an
 unroutable host produces a genuine `RequestException`.
+
+`SPARKPOST_RETURN_PATH` is what exercises the envelope FROM, and it is there because bounce handling
+and DMARC are decided somewhere no test can reach. The envelope address takes the bounces and is
+what SPF authenticates; the header From is what DMARC aligns against; SparkPost refuses a bounce
+domain the account has not verified. `send` prints `return_path` from the built payload rather than
+from the variable — it is a top-level field, and putting it under `options` instead is a mistake the
+API accepts in silence. `events` then prints `msg_from` whenever it differs from `friendly_from`,
+which is the same envelope address as SparkPost recorded it.
+
+**`vendor/bin/rig send` sends real mail** the moment a real `.env` is present — there is no dry run,
+and `--env=` pointing at a throwaway file with an invalid key is the way to exercise the output
+without one.
 
 `.env` and `.env.*` are gitignored with `!.env.example`; `harness/` is `export-ignore`d, along with
 `tests/`, `CLAUDE.md` and the tooling config, so none of it ships in the Packagist archive.

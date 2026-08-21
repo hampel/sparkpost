@@ -11,7 +11,16 @@
  * that says how many recipients it actually took, and those two facts disagree more often
  * than you would like. wasAccepted() is the check a caller has to make.
  *
- * Needs SPARKPOST_API_KEY, SPARKPOST_TO, SPARKPOST_FROM.
+ * Set SPARKPOST_RETURN_PATH to exercise the envelope FROM, which is a second thing the
+ * suite cannot settle. It is a different address from the header From, and the difference
+ * is the whole point: the envelope address is where bounces are delivered and what the
+ * receiver runs SPF against, while the header From is what the reader sees and what DMARC
+ * aligns against. A bounce domain that is not verified on the account is refused by
+ * SparkPost, and one that is verified but not aligned passes SPF and still fails DMARC -
+ * neither of which any amount of unit testing can tell you, because both verdicts are
+ * reached on somebody else's mail server.
+ *
+ * Needs SPARKPOST_API_KEY, SPARKPOST_TO, SPARKPOST_FROM. SPARKPOST_RETURN_PATH is optional.
  *
  * @var Hampel\Rig\Io $io
  */
@@ -42,6 +51,7 @@ if ($to === false || $to === '' || $from === false || $from === '') {
 }
 
 $region = getenv('SPARKPOST_REGION') ?: null;
+$returnPath = getenv('SPARKPOST_RETURN_PATH') ?: null;
 
 $factory = new HttpFactory();
 $sparkpost = new SparkPost(Config::forRegion($key, $region), new Client(), $factory, $factory);
@@ -49,6 +59,7 @@ $sparkpost = new SparkPost(Config::forRegion($key, $region), new Client(), $fact
 $io->value('endpoint', Config::forRegion($key, $region)->resolve('transmissions'));
 $io->value('from', $from);
 $io->value('to', $to);
+$io->value('return path', $returnPath ?? '(none - SparkPost picks its own bounce domain)');
 $io->line();
 
 $transmission = Transmission::make()
@@ -61,8 +72,20 @@ $transmission = Transmission::make()
     ->openTracking(false)
     ->clickTracking(false);
 
+if ($returnPath !== null) {
+    $transmission->returnPath($returnPath);
+}
+
+$payload = $transmission->toArray();
+
 // The sandbox domain is switched on by the builder itself - show what that produced.
-$io->value('payload', $transmission->toArray()['options'] ?? []);
+$io->value('options', $payload['options'] ?? []);
+
+// And show return_path from the payload rather than from the variable, because where it
+// lands is the part worth seeing: it is a top-level field, not one of the options, and
+// putting it under options is a mistake SparkPost accepts in silence - a 200, a delivered
+// message, and the account's default bounce domain still on the envelope.
+$io->value('return_path', $payload['return_path'] ?? '(not in the payload)');
 $io->line();
 
 try {
@@ -84,4 +107,16 @@ if ($result->wasAccepted()) {
     $io->info('Accepted. It should arrive shortly - check the spam folder before believing otherwise.');
 } else {
     $io->warn('HTTP 200, and nobody was accepted. This is the case that looks like success and is not.');
+}
+
+if ($returnPath !== null) {
+    $io->line();
+    $io->info('SparkPost took the return path, which only means the bounce domain is verified.');
+    $io->info('Whether it works is decided at the far end - read the delivered message:');
+    $io->line('  Return-Path:                 the envelope address, and where a bounce would go');
+    $io->line('  Authentication-Results: spf  authenticates the envelope domain, not the From');
+    $io->line('  Authentication-Results: dmarc  passes only if one of SPF or DKIM aligns with From');
+    $io->line();
+    $io->info("Or ask the API: vendor/bin/rig events reports msg_from, which is this envelope");
+    $io->info('address as SparkPost recorded it against the message.');
 }
