@@ -15,10 +15,11 @@
  * suite cannot settle. It is a different address from the header From, and the difference
  * is the whole point: the envelope address is where bounces are delivered and what the
  * receiver runs SPF against, while the header From is what the reader sees and what DMARC
- * aligns against. Neither verdict is reached here: SparkPost accepts a return path on a
- * domain it has no reason to trust, and a domain that is verified but not aligned passes
- * SPF and still fails DMARC. Both are decided on somebody else's mail server, which is
- * exactly why this is an exercise rather than a test.
+ * aligns against. Note which of the two SparkPost actually polices: the From must be on a
+ * configured sending domain or the transmission is rejected, while the return path is not
+ * checked at all and a bogus one is accepted. The cost of that shows up as mail that never
+ * arrives, on somebody else's server, which is exactly why this is an exercise and not a
+ * test.
  *
  * Needs SPARKPOST_API_KEY, SPARKPOST_TO, SPARKPOST_FROM. SPARKPOST_RETURN_PATH is optional.
  *
@@ -111,13 +112,13 @@ if ($result->wasAccepted()) {
 
 if ($returnPath !== null) {
     $io->line();
-    // Acceptance proves nothing about the bounce domain. Observed 21 August 2026 from the
-    // sparkpost-transport harness: a send with return_path on a domain nobody here owns
-    // came back 200 with 1 accepted. Whatever SparkPost validates at transmission time, it
-    // is not that the domain is verified on the account.
-    $io->info('SparkPost took the return path. That is not proof the domain is verified -');
-    $io->info('an unverified one is accepted too. It is decided at the far end, so read the');
-    $io->info('delivered message:');
+    // Verified 22 August 2026: a bogus return path is accepted (200), while a From on an
+    // unconfigured sending domain is rejected outright. SparkPost checks the two in
+    // different places, and conflating them is what put a wrong claim in these files.
+    // The bogus-return-path message never arrived, so the cost lands downstream instead.
+    $io->info('SparkPost took the return path. That is not proof the domain is anything -');
+    $io->info('a bogus one is accepted too, unlike a From on an unconfigured domain, which');
+    $io->info('is rejected outright. It is decided at the far end, so read what arrives:');
     $io->line('  Return-Path:                 the envelope address, and where a bounce would go');
     $io->line('  Authentication-Results: spf  authenticates the envelope domain, not the From');
     $io->line('  Authentication-Results: dmarc  passes only if one of SPF or DKIM aligns with From');
