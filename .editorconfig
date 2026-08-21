@@ -11,9 +11,14 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 4
 
-[*.{json,neon,yml,yaml}]
+[*.{json,neon}]
 indent_style = space
 indent_size = 4
+
+# 2, which is what GitHub Actions workflows are written in everywhere
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
 
 [*.md]
 trim_trailing_whitespace = false
