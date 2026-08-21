@@ -52,8 +52,9 @@ happens to be installed, but the explicit constructor has to remain the supporte
 `psr/log` is constrained to `^1.1|^2.0|^3.0` **on purpose**. XenForo 2.3 ships `psr/log 1.1.4`, and
 the add-on installs its own `vendor/` alongside XenForo's — requiring `^3.0` here would put a second,
 signature-incompatible `LoggerInterface` on the autoloader. The same reasoning applies to
-`psr/http-message` (`^1.1|^2.0`; XF ships 2.0). Check what XenForo bundles in
-`/srv/www/xenforo23.local/src/vendor/composer/installed.json` before widening or narrowing either.
+`psr/http-message` (`^1.1|^2.0`; XF ships 2.0). Verify those two versions against the XenForo
+install itself before widening or narrowing either — a bundled version can move in a point release,
+and this constraint is only correct for as long as it matches what XF actually ships.
 
 **`tests/RecordingLogger.php` declares `log()` without parameter types on purpose**, and that is
 the same constraint reaching into the test suite: `psr/log` 1.1 declares `log()` untyped while
@@ -212,7 +213,8 @@ without one.
 
 ## Version support
 
-`php: >=8.3` per the Tier A policy in `/srv/www/version-support.html`, with PHPStan analysing the
+`php: >=8.3` per the Tier A support policy — published packages get the widest support and the most
+verification, because strangers are hurt silently when they break — with PHPStan analysing the
 whole 8.3–8.5 range in one pass (`phpVersion` in `phpstan.neon`). Keep that range in step with the
 `php` constraint in `composer.json`. Widening or narrowing either is a policy decision, not a
 judgement call.
