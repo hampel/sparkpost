@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-0.1.1 (2026-08-21)
+0.1.1 (2026-08-22)
 ------------------
 
 * documentation only: no code changes
