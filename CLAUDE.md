@@ -7,10 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `hampel/sparkpost` — a PHP client for the SparkPost API, written to be usable from any host
 application rather than tied to one HTTP library or framework.
 
-It replaces two hand-written API clients: the one inside the `Hampel/SparkPostMail` XenForo add-on,
-and the transmission-posting half of `hampel/symfonymailer-sparkpost`. The Symfony Mailer transport
-lives in a separate package, `hampel/sparkpost-transport`, which depends on this one. **Nothing in
-here may depend on `symfony/mailer`** — that boundary is the reason the packages are split.
+The Symfony Mailer transport lives in a separate package, `hampel/sparkpost-transport`, which
+depends on this one. **Nothing in here may depend on `symfony/mailer`** — that boundary is the
+reason the packages are split, and it is what keeps this package usable from an application with no
+Symfony in it at all.
 
 ## Commands
 
@@ -30,10 +30,11 @@ vendor/bin/rig                                  # the live-API exercises, below
 The client is injected as `Psr\Http\Client\ClientInterface` with PSR-17 factories, never as a
 concrete class, and `Connection` is the only file that touches HTTP.
 
-This is not abstraction for its own sake. The XenForo add-on cannot use an arbitrary HTTP client: it
-must route outbound requests through `XF\Http\Reader::requestUntrusted()` for proxy support and SSRF
-protection. The previous package hardcoded Guzzle, so the add-on wrote a second API client rather
-than use it. Under PSR-18 it writes a small adapter instead.
+This is not abstraction for its own sake. Some host applications cannot use an arbitrary HTTP
+client at all: they require every outbound request to go through their own stack, for proxy support
+and SSRF protection. A package that hardcodes Guzzle is unusable there, and what happens next is
+that a second API client gets written rather than this one adopted. Under PSR-18 the host writes a
+small adapter instead.
 
 Two consequences to keep in mind when changing `Connection`:
 
@@ -43,24 +44,29 @@ Two consequences to keep in mind when changing `Connection`:
 - **There is no `'json' => $payload` convenience.** The body is encoded and wrapped in a stream
   through the PSR-17 factory by hand. Do not reach for a Guzzle option to avoid it.
 
-**Do not add `php-http/discovery`** as a dependency. It is a Composer plugin, and the XenForo add-on
-sets `"allow-plugins": {"php-http/discovery": false}`. A convenience constructor may use it if it
-happens to be installed, but the explicit constructor has to remain the supported path.
+**Do not add `php-http/discovery`** as a dependency. It is a Composer plugin, and a consumer may
+refuse to run it — `"allow-plugins": {"php-http/discovery": false}` is a realistic line to find in
+an application's `composer.json`. A convenience constructor may use it if it happens to be
+installed, but the explicit constructor has to remain the supported path.
 
 ## Dependency constraints are load-bearing
 
-`psr/log` is constrained to `^1.1|^2.0|^3.0` **on purpose**. XenForo 2.3 ships `psr/log 1.1.4`, and
-the add-on installs its own `vendor/` alongside XenForo's — requiring `^3.0` here would put a second,
-signature-incompatible `LoggerInterface` on the autoloader. The same reasoning applies to
-`psr/http-message` (`^1.1|^2.0`; XF ships 2.0). Verify those two versions against the XenForo
-install itself before widening or narrowing either — a bundled version can move in a point release,
-and this constraint is only correct for as long as it matches what XF actually ships.
+`psr/log` is constrained to `^1.1|^2.0|^3.0` **on purpose**. A host application may bundle its own
+`psr/log 1.x` and install a package's `vendor/` alongside it — requiring `^3.0` here would then put
+a second, signature-incompatible `LoggerInterface` on the autoloader, and the failure arrives at
+runtime rather than at install. The same reasoning applies to `psr/http-message` (`^1.1|^2.0`).
+
+Neither range is there to be tidied up. Widening or narrowing either is a compatibility decision
+about the applications that actually consume this package, so check against those rather than
+against whatever looks current — and note that a bundled version can move in a point release, so
+the answer has a shelf life.
 
 **`tests/RecordingLogger.php` declares `log()` without parameter types on purpose**, and that is
 the same constraint reaching into the test suite: `psr/log` 1.1 declares `log()` untyped while
 `psr/log` 3 declares `string|\Stringable $message`, and an untyped parameter is wider than both, so
 one class satisfies every version the package supports. Adding the types "for tidiness" compiles
-fine here and breaks the `--prefer-lowest` corner in CI — which is the XenForo corner.
+fine here and breaks the `--prefer-lowest` corner in CI, which is what holds the `psr/log 1.1` end
+of that range honest.
 
 ## Architecture
 
@@ -105,12 +111,10 @@ the disallowed-header list, `false` surviving the prune, and sandbox auto-detect
 is commented where it is implemented, and each is asserted on its own in
 `TransmissionTest`.
 
-Those rules were worked out by the `sparkpost-mailer` WordPress plugin before this package
-existed, and were checked against fixtures captured from it while the builder was being
-written. That scaffolding is gone: the plugin is not a consumer of this package and not an
-authority to stay in step with, and a fixture recaptured from anything other than the
-plugin would have been a golden file regenerated from the code under test — which
-certifies nothing.
+Those rules predate this package — they were established in an earlier implementation and the
+builder was checked against captured fixtures while it was being written. That scaffolding is gone,
+because a fixture recaptured from anywhere but the original source would have been a golden file
+regenerated from the code under test, which certifies nothing.
 
 What survives is `test_the_whole_payload_for_a_message_with_to_cc_and_bcc`, which asserts
 one entire payload with `assertSame`, key order included. It duplicates the per-field

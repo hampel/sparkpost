@@ -221,10 +221,11 @@ try {
 
 ## Bringing your own HTTP client
 
-Any PSR-18 client works, which matters when the host has its own HTTP stack that you are
-not free to bypass. XenForo, for example, routes outbound requests through a configurable
-proxy with SSRF protections; an adapter implementing `sendRequest()` over
-`XF\Http\Reader::requestUntrusted()` keeps all of that and still shares this package.
+Any PSR-18 client works, which matters when the host application has its own HTTP stack
+that you are not free to bypass — one routing every outbound request through a configurable
+proxy, with SSRF protections applied on the way out. An adapter implementing `sendRequest()`
+over that keeps all of it and still shares this package, rather than forcing a second API
+client to be written alongside.
 
 The same seam is what makes the test suite network-free — see `tests/StubClient.php`.
 

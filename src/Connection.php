@@ -19,9 +19,10 @@ use Psr\Log\NullLogger;
  * Everything that touches HTTP, in one place.
  *
  * The client is injected as a PSR-18 ClientInterface rather than a concrete one, which is
- * the whole point of the package: a host with its own HTTP stack - XenForo's proxy-aware,
- * SSRF-guarded reader, say - implements sendRequest() over it and shares this code, instead
- * of writing a second API client because ours hardcoded the wrong library.
+ * the whole point of the package: a host application with its own HTTP stack - a proxy-aware,
+ * SSRF-guarded client that all outbound requests are required to go through - implements
+ * sendRequest() over it and shares this code, instead of writing a second API client because
+ * ours hardcoded the wrong library.
  *
  * A PSR-18 client does not throw on an HTTP status, only on a transport failure, so the
  * two failure modes stay cleanly separated here.

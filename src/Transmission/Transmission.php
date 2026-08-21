@@ -9,11 +9,10 @@ use Hampel\SparkPost\Exception\InvalidArgumentException;
 /**
  * Builds a SparkPost transmission payload.
  *
- * This is the piece three separate implementations had each solved on their own - the
- * WordPress plugin, the XenForo add-on's transport, and hampel/symfonymailer-sparkpost -
- * and the reason it is worth a type is that most of the difficulty is not in the obvious
- * fields. It is in the handful of rules below, each of which is easy to get wrong and
- * produces mail that looks fine until someone reads the headers.
+ * This is the piece three separate implementations had each solved on their own before this
+ * package existed, and the reason it is worth a type is that most of the difficulty is not
+ * in the obvious fields. It is in the handful of rules below, each of which is easy to get
+ * wrong and produces mail that looks fine until someone reads the headers.
  *
  *  - SparkPost sends one message per recipient, so without `header_to` every recipient
  *    sees a To: line containing only themselves. Setting it on every recipient is what
@@ -26,8 +25,7 @@ use Hampel\SparkPost\Exception\InvalidArgumentException;
  *  - Some headers are derived by SparkPost from the transmission itself and are rejected
  *    if you also pass them in content.headers.
  *
- * Every one of those was learned by the sparkpost-mailer WordPress plugin first, and each
- * is asserted in TransmissionTest - individually, and once as a whole payload.
+ * Each is asserted in TransmissionTest - individually, and once as a whole payload.
  */
 final class Transmission
 {
