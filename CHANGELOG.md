@@ -1,8 +1,8 @@
 CHANGELOG
 =========
 
-Unreleased
-----------
+0.1.0 (2026-08-21)
+------------------
 
 * initial development - PSR-18 connection, configuration, exception hierarchy and the
   transmissions resource
