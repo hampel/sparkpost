@@ -5,12 +5,6 @@ parameters:
         - src
         - tests
 
-    excludePaths:
-        # Deliberately redeclares WordPress so the plugin's own code can be loaded outside
-        # it. Not part of the package, never autoloaded, and analysing it means analysing
-        # a stub of somebody else's framework - the suite reads its output, not its code.
-        - tests/fixtures/wordpress-plugin/capture.php
-
     # Analyse against every PHP version the package claims to support, in one run. This
     # covers the PHP axis of the support matrix without running it: PHPStan knows which
     # functions exist in which version and what changed when. Keep in step with the

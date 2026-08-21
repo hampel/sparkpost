@@ -189,4 +189,60 @@ final class TransmissionTest extends TestCase
 
         $this->assertSame([['address' => ['email' => 'sink@example.test']]], self::path($payload, 'recipients'));
     }
+
+    /**
+     * The whole payload at once, for the message that puts the most rules in contact.
+     *
+     * Every rule below is already asserted on its own above, so this deliberately covers
+     * the same ground a second time. What it adds is the shape: assertSame compares key
+     * order and, more to the point, notices a field that silently appears or disappears -
+     * which a per-field assertion structurally cannot, because it only ever looks where it
+     * is told.
+     *
+     * Four recipients from a To of two, a Cc and a Bcc; all four carrying the same
+     * header_to built from the To list alone; the CC header that is what makes Bob visible
+     * while Carol stays blind; and the three options that had to survive being false.
+     *
+     * The expected array is written out here rather than loaded from a fixture on purpose.
+     * A golden file gets regenerated from the code under test the moment it fails, which
+     * certifies nothing; this one has to be read and edited by hand, in the same diff as
+     * whatever changed the builder.
+     */
+    public function test_the_whole_payload_for_a_message_with_to_cc_and_bcc(): void
+    {
+        $payload = Transmission::make()
+            ->from('webmaster@example.com')
+            ->subject('Hello')
+            ->text('Body.')
+            ->to('alice@example.com', 'Alice')
+            ->to('amy@example.com')
+            ->cc('bob@example.com', 'Bob')
+            ->bcc('carol@example.com')
+            ->openTracking(false)
+            ->clickTracking(false)
+            ->transactional()
+            ->toArray();
+
+        $headerTo = 'Alice <alice@example.com>, amy@example.com';
+
+        $this->assertSame([
+            'options' => [
+                'open_tracking' => false,
+                'click_tracking' => false,
+                'transactional' => true,
+            ],
+            'recipients' => [
+                ['address' => ['email' => 'alice@example.com', 'header_to' => $headerTo]],
+                ['address' => ['email' => 'amy@example.com', 'header_to' => $headerTo]],
+                ['address' => ['email' => 'bob@example.com', 'header_to' => $headerTo]],
+                ['address' => ['email' => 'carol@example.com', 'header_to' => $headerTo]],
+            ],
+            'content' => [
+                'from' => ['email' => 'webmaster@example.com'],
+                'subject' => 'Hello',
+                'text' => 'Body.',
+                'headers' => ['CC' => 'Bob <bob@example.com>'],
+            ],
+        ], $payload);
+    }
 }

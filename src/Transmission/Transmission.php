@@ -26,8 +26,8 @@ use Hampel\SparkPost\Exception\InvalidArgumentException;
  *  - Some headers are derived by SparkPost from the transmission itself and are rejected
  *    if you also pass them in content.headers.
  *
- * Every one of those was learned by the WordPress plugin first; this class is checked
- * against fixtures captured from it, in tests/fixtures/wordpress-plugin/.
+ * Every one of those was learned by the sparkpost-mailer WordPress plugin first, and each
+ * is asserted in TransmissionTest - individually, and once as a whole payload.
  */
 final class Transmission
 {

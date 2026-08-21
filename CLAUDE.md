@@ -95,25 +95,27 @@ distinguishes client from server errors still catches it.
 that can answer on that URL — a proxy or gateway will return HTML — so `json_decode()` returning
 `null`, and a JSON body with no `errors` key, are both expected inputs, not edge cases.
 
-## The Transmission builder, and why the fixtures matter
+## The Transmission builder
 
 `Transmission` builds the payload. Most of its value is not the obvious fields but five
 rules that are easy to get wrong and produce mail that looks fine until someone reads the
 headers — `header_to` on every recipient, the `CC` header being what makes Cc visible,
 the disallowed-header list, `false` surviving the prune, and sandbox auto-detection. Each
-is commented where it is implemented.
+is commented where it is implemented, and each is asserted on its own in
+`TransmissionTest`.
 
-**Those rules were worked out by the WordPress plugin first**, and
-`tests/fixtures/wordpress-plugin/*.json` is that plugin's real output — captured by
-`tests/fixtures/wordpress-plugin/capture.php`, which loads
-`includes/class-mailer.php` verbatim outside WordPress with WordPress stubbed, and calls
-the private `build_transmission()` by reflection. Nothing is retyped, so the fixtures
-cannot drift from what the plugin does.
+Those rules were worked out by the `sparkpost-mailer` WordPress plugin before this package
+existed, and were checked against fixtures captured from it while the builder was being
+written. That scaffolding is gone: the plugin is not a consumer of this package and not an
+authority to stay in step with, and a fixture recaptured from anything other than the
+plugin would have been a golden file regenerated from the code under test — which
+certifies nothing.
 
-`TransmissionParityTest` asserts with `assertSame`, which compares key order too. That is
-stricter than SparkPost needs, deliberately: it means a change to the payload shape fails
-loudly rather than passing as "equivalent". If the plugin changes, re-run `capture.php`
-rather than editing the JSON.
+What survives is `test_the_whole_payload_for_a_message_with_to_cc_and_bcc`, which asserts
+one entire payload with `assertSame`, key order included. It duplicates the per-field
+tests on purpose: only a whole-payload assertion notices a field that silently appears or
+disappears. Its expected array is written out in PHP rather than loaded from a file so
+that changing it takes a hand edit in the same diff as whatever changed the builder.
 
 **`prune()` is not `array_filter()`.** The default callback drops `false` and `0`, which
 would turn `open_tracking => false` into "use the account default" — a bug the package
@@ -215,9 +217,7 @@ whole 8.3–8.5 range in one pass (`phpVersion` in `phpstan.neon`). Keep that ra
 `php` constraint in `composer.json`. Widening or narrowing either is a policy decision, not a
 judgement call.
 
-PHPStan runs at **level 10** over both `src` and `tests`, excluding
-`tests/fixtures/wordpress-plugin/capture.php` — that file redeclares WordPress on purpose, and the
-suite reads its output rather than its code.
+PHPStan runs at **level 10** over both `src` and `tests`, with nothing excluded.
 
 CI runs the corners of the range rather than the whole matrix: 8.3 with `--prefer-lowest`, 8.3
 current, and 8.5. PHPStan runs in each of those jobs and not only in one of its own, because
