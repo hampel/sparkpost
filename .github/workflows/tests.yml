@@ -67,8 +67,11 @@ jobs:
       - run: composer install --no-dev --prefer-dist --no-progress
 
       # PHPStan is itself a dev dependency, so --no-dev just deleted it. It has to come
-      # from outside the package.
-      - run: composer -d /tmp/phpstan require phpstan/phpstan --no-progress
+      # from outside the package. composer -d does not create the directory, so mkdir
+      # first or the step dies with "Invalid working directory specified".
+      - run: |
+          mkdir -p /tmp/phpstan
+          composer -d /tmp/phpstan require phpstan/phpstan --no-progress
 
       # -c is not optional. Without it PHPStan discovers the package's own phpstan.neon,
       # which points at tests/ and can no longer resolve PHPUnit - turning the run into a
