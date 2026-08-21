@@ -163,7 +163,9 @@ the server runs.
 
 `tests/StubClient.php` is a PSR-18 client that answers from a queue and records requests, so the
 suite needs no network and no Guzzle mock handler. Guzzle is a dev dependency only, for its PSR-7
-objects. Any new resource gets tested through the stub — if a test needs the network, the design is
+objects, and is constrained to `^7.8|^8.0` so CI resolves it at both majors — Guzzle 8 brings
+`guzzlehttp/psr7 ^3.0`, and it is the client most consumers will plug into the PSR-18 seam, so a
+PSR-7 major that broke request building here should fail in CI rather than in their application. Any new resource gets tested through the stub — if a test needs the network, the design is
 wrong.
 
 The rest of the suite's scaffolding, none of it incidental:

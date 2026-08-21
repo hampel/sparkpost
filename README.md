@@ -11,7 +11,7 @@ A PHP client for the [SparkPost API](https://developers.sparkpost.com/api/), bui
 composer require hampel/sparkpost
 ```
 
-You also need a PSR-18 client and a PSR-17 factory. Guzzle 7 provides both:
+You also need a PSR-18 client and a PSR-17 factory. Guzzle provides both, 7 or 8:
 
 ```bash
 composer require guzzlehttp/guzzle
