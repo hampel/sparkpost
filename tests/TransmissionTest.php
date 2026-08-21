@@ -6,6 +6,7 @@ namespace Hampel\SparkPost\Tests;
 
 use Hampel\SparkPost\Exception\InvalidArgumentException;
 use Hampel\SparkPost\Transmission\Address;
+use Hampel\SparkPost\Transmission\Attachment;
 use Hampel\SparkPost\Transmission\Transmission;
 use PHPUnit\Framework\TestCase;
 
@@ -188,6 +189,57 @@ final class TransmissionTest extends TestCase
             ->toArray();
 
         $this->assertSame([['address' => ['email' => 'sink@example.test']]], self::path($payload, 'recipients'));
+    }
+
+    public function test_html_and_text_are_both_carried_as_alternatives(): void
+    {
+        $payload = Transmission::make()
+            ->from('webmaster@example.com')
+            ->subject('Hello')
+            ->html('<p>HTML body.</p>')
+            ->text('Plain alternative.')
+            ->to('alice@example.com')
+            ->toArray();
+
+        // both, not one or the other - the text part is the alternative a client falls
+        // back to, so dropping it silently is how a message becomes unreadable in mutt
+        $this->assertSame('<p>HTML body.</p>', self::path($payload, 'content.html'));
+        $this->assertSame('Plain alternative.', self::path($payload, 'content.text'));
+    }
+
+    public function test_reply_to_addresses_are_formatted_as_one_string(): void
+    {
+        $payload = $this->minimal()
+            ->replyTo('reply@example.com', 'Reply Desk')
+            ->replyTo('second@example.com')
+            ->toArray();
+
+        // SparkPost takes reply_to as a single string rather than a list, so more than one
+        // address has to be joined here or only the last would survive
+        $this->assertSame(
+            'Reply Desk <reply@example.com>, second@example.com',
+            self::path($payload, 'content.reply_to')
+        );
+    }
+
+    public function test_attachments_and_inline_images_go_into_separate_keys(): void
+    {
+        $payload = $this->minimal()
+            ->attach(Attachment::fromData('invoice.pdf', 'application/pdf', 'INVOICE-BYTES'))
+            ->attach(Attachment::inline('logo', 'image/png', 'LOGO-BYTES'))
+            ->toArray();
+
+        // an inline image is addressed by cid: from the HTML and must not appear as a
+        // download, so the two kinds are split by how they were built, not by type
+        $this->assertSame(
+            [['name' => 'invoice.pdf', 'type' => 'application/pdf', 'data' => base64_encode('INVOICE-BYTES')]],
+            self::path($payload, 'content.attachments')
+        );
+
+        $this->assertSame(
+            [['name' => 'logo', 'type' => 'image/png', 'data' => base64_encode('LOGO-BYTES')]],
+            self::path($payload, 'content.inline_images')
+        );
     }
 
     /**

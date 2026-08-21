@@ -73,4 +73,14 @@ final class ConfigTest extends TestCase
             (new Config('key'))->resolve('/api/v1/events/message?page=2', ['per_page' => 10])
         );
     }
+
+    /**
+     * host() is for anything that has to name the endpoint without making a request - a
+     * transport's __toString(), a log line, a settings screen.
+     */
+    public function test_it_reports_the_host_for_the_default_and_for_a_region(): void
+    {
+        $this->assertSame('api.sparkpost.com', (new Config('key'))->host());
+        $this->assertSame('api.eu.sparkpost.com', Config::forRegion('key', 'eu')->host());
+    }
 }

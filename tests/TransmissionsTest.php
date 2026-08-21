@@ -7,6 +7,7 @@ namespace Hampel\SparkPost\Tests;
 use Hampel\SparkPost\Config;
 use Hampel\SparkPost\Exception\ClientException;
 use Hampel\SparkPost\Exception\ExceptionInterface;
+use Hampel\SparkPost\Exception\InvalidArgumentException;
 use Hampel\SparkPost\Exception\RateLimitException;
 use Hampel\SparkPost\Exception\RequestException;
 use Hampel\SparkPost\Exception\ServerException;
@@ -238,5 +239,29 @@ final class TransmissionsTest extends TestCase
 
         $this->assertNotNull($logger->contextFor('SparkPost error response'));
         $this->assertStringNotContainsString('super-secret-key', json_encode($logger->records, JSON_THROW_ON_ERROR));
+    }
+    /**
+     * The other side of the PSR-18 seam: this one is caught before the network, so it is
+     * an InvalidArgumentException rather than anything that implies SparkPost was asked.
+     * Malformed UTF-8 is the realistic way in - a subject or a name copied out of a
+     * database in the wrong encoding.
+     */
+    public function test_an_unencodable_payload_is_rejected_before_the_request(): void
+    {
+        $sparkpost = $this->sparkpost();
+
+        try {
+            $sparkpost->transmissions()->send([
+                'recipients' => [['address' => ['email' => 'alice@example.com']]],
+                'content' => ['subject' => "\xB1\x31", 'text' => 'Body.'],
+            ]);
+
+            $this->fail('An unencodable payload should not have been sent.');
+        } catch (InvalidArgumentException $e) {
+            $this->assertStringContainsString('Could not encode the request payload', $e->getMessage());
+        }
+
+        // and nothing was handed to the client
+        $this->assertSame([], $this->client->requests);
     }
 }
