@@ -218,9 +218,18 @@ from the variable — it is a top-level field, and putting it under `options` in
 API accepts in silence. `events` then prints `msg_from` whenever it differs from `friendly_from`,
 which is the same envelope address as SparkPost recorded it.
 
-**`vendor/bin/rig send` sends real mail** the moment a real `.env` is present — there is no dry run,
-and `--env=` pointing at a throwaway file with an invalid key is the way to exercise the output
-without one.
+**`vendor/bin/rig send` delivers nothing unless `SPARKPOST_DELIVER=1`.** It rewrites recipients to
+`<address>.sink.sparkpostmail.com`, which SparkPost accepts, counts and discards while still
+producing real delivery and bounce events — so the payload is genuinely exercised and no mail goes
+out. That default is inverted from the obvious one on purpose: a session once ran this expecting a
+missing-credentials guard, not knowing a populated `.env` was already here, and mail went out. An
+opt-in sink flag would not have helped, because a session unaware of the `.env` is equally unaware
+of the flag. Do not flip it to opt-in.
+
+The cost is that sink runs answer nothing decided at the far end — delivery, `Return-Path`, DMARC —
+and the exercise says so on the way out. `SPARKPOST_DELIVER=1` is the deliberate act that checks
+those, and a shell variable beats the `.env` because `rig` skips keys already in the process
+environment.
 
 `.env` and `.env.*` are gitignored with `!.env.example`; `harness/` is `export-ignore`d, along with
 `tests/`, `CLAUDE.md` and the tooling config, so none of it ships in the Packagist archive.
