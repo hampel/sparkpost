@@ -213,6 +213,31 @@ thing that exercises `add()` and `delete()` for real.
 listed would delete a genuine suppression on the way out — someone else's bounce, removed
 silently. It generates an address at `example.org`, verifies it is absent, then proceeds.
 
+## Sending domains exist for one field
+
+`SendingDomains` is read-only and always will be: writing there changes where an account's
+mail appears to come from, and the narrow grant is worth keeping narrow. Verified against the
+live API — with the key set to sending-domains read-only, `GET` works and `POST` returns 403.
+
+It is in the package for `subaccount_id`. Suppression is scoped per subaccount, and **a
+subaccount API key cannot read the subaccounts endpoint at all** — that is not a missing
+grant, SparkPost has no such permission for a subaccount key, confirmed on a real one. The
+sending domain is therefore the only route from an address to the subaccount it belongs to.
+
+**The single-domain response is not the same shape as a list row.** The list gives `domain`;
+`GET /sending-domains/{domain}` omits it, because it is in the URL, and adds `dkim`. So
+`SendingDomain::fromArray()` takes the requested domain as a second argument — without it,
+`find()` returns an object whose own `domain` is an empty string, which nothing would notice
+until it was logged.
+
+`status` and `dkim` are typed `array<mixed>`, not `array<string, mixed>`. That is not laziness
+at level 10: a decoded JSON value cannot be *shown* to have string keys, and claiming it does
+would be an assertion dressed as a type.
+
+`forAddress()` accepts `Support <noreply@example.com>` as well as a bare address. Taking
+everything after the last `@` keeps the closing bracket and then asks SparkPost for a domain
+with a `>` in it — a test asserted that behaviour as correct before it was noticed.
+
 ## Tests
 
 `tests/StubClient.php` is a PSR-18 client that answers from a queue and records requests, so the

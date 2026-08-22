@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Hampel\SparkPost;
 
 use Hampel\SparkPost\Resource\MessageEvents;
+use Hampel\SparkPost\Resource\SendingDomains;
 use Hampel\SparkPost\Resource\Suppression;
 use Hampel\SparkPost\Resource\Transmissions;
 use Psr\Http\Client\ClientInterface;
@@ -31,6 +32,8 @@ final class SparkPost
     private ?MessageEvents $messageEvents = null;
 
     private ?Suppression $suppression = null;
+
+    private ?SendingDomains $sendingDomains = null;
 
     public function __construct(
         private readonly Config $config,
@@ -60,6 +63,11 @@ final class SparkPost
     public function suppression(): Suppression
     {
         return $this->suppression ??= new Suppression($this->connection, $this->logger);
+    }
+
+    public function sendingDomains(): SendingDomains
+    {
+        return $this->sendingDomains ??= new SendingDomains($this->connection, $this->logger);
     }
 
     /**

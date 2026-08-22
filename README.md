@@ -232,6 +232,38 @@ Nothing here retries for you — poll if you need to see the change.
 Whether an unsubscribe in your application should also go on SparkPost's list is a policy
 question, and it is yours rather than this package's.
 
+## Sending domains, and finding the subaccount
+
+Read-only. Creating and verifying a sending domain is an administration task done once in
+SparkPost's own UI, and a key that can write here can change where an account's mail appears
+to come from — so this only reads, and the key only needs the read grant.
+
+```php
+foreach ($sparkpost->sendingDomains()->all() as $domain) {
+    $domain->domain;
+    $domain->subaccountId;
+    $domain->isDefaultBounceDomain;
+    $domain->status['ownership_verified'] ?? null;
+}
+```
+
+The reason it is here is `subaccountId`. **Suppression is per-subaccount**, and a subaccount
+API key cannot read the subaccounts endpoint at all — SparkPost offers no such permission
+for one. The sending domain carries the number, so the address you send as is the way to
+find out which subaccount you are operating in:
+
+```php
+$domain = $sparkpost->sendingDomains()->forAddress('Support <noreply@mail.example.com>');
+
+$domain?->subaccountId;      // 3629
+$domain?->hasSubaccount();   // false for the primary account, which is 0 or absent
+```
+
+`forAddress()` reads the display-name form as well as a bare address, and returns `null`
+without making a request when it is handed something that is not an address at all.
+`find($domain)` returns `null` for a domain the account does not have — which is also the
+reason a send from it would be refused.
+
 ## HTTP 200 does not mean the mail was sent
 
 SparkPost returns `200` having accepted zero recipients, so the status code alone will tell
