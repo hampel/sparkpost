@@ -1,8 +1,8 @@
 CHANGELOG
 =========
 
-Unreleased
-----------
+0.2.0 (2026-08-22)
+------------------
 
 * add the suppression resource - search, find, isSuppressed, add and delete
 * add the sending domains resource - all, find and forAddress, read-only
