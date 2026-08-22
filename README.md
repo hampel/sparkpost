@@ -215,6 +215,12 @@ $page->totalCount;
 $page->hasMore;
 ```
 
+**The list you see is the one your API key can see.** Suppression is scoped per subaccount,
+and a subaccount key is bound to its own automatically — so an address suppressed under a
+different subaccount simply is not there as far as that key is concerned. To work with a
+particular subaccount's list, use a key belonging to it. `sendingDomains()->forAddress()`
+above is how to find out which subaccount an address you send from belongs to.
+
 Adding one is a `PUT`, and therefore an upsert — an address already listed has its entry
 replaced rather than the call being rejected:
 

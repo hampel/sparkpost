@@ -209,6 +209,21 @@ sleeps — hiding it would make every genuine miss slow, and a caller that needs
 change has to poll. `harness/suppression.php` does exactly that, and its round trip is the only
 thing that exercises `add()` and `delete()` for real.
 
+**Do not add `X-MSYS-SUBACCOUNT` support**, and this is the note that exists so it does not
+get added by someone reading SparkPost's documentation and finding it missing.
+
+Suppression is scoped per subaccount, and SparkPost offers a request header to say which one.
+It is not needed here, because the API key already answers that question: a subaccount key is
+bound to its own subaccount automatically and **ignores the header** — verified on a real one,
+where `X-MSYS-SUBACCOUNT: 0` and `X-MSYS-SUBACCOUNT: 3629` returned byte-identical results.
+An account-level key would honour it, but the way to manage one subaccount's suppressions is
+to use a key for that subaccount, which SparkPost lets you create for exactly this reason.
+
+Supporting it would mean `Connection` growing per-request headers — it has none today, and
+nothing else has asked for them — to serve a caller that does not exist and could not be
+tested with any key this package has been run against. `sendingDomains()->forAddress()`
+already answers *which* subaccount an address belongs to, which was the useful half.
+
 **The harness checks before it creates.** A round trip that added an address which was already
 listed would delete a genuine suppression on the way out — someone else's bounce, removed
 silently. It generates an address at `example.org`, verifies it is absent, then proceeds.
