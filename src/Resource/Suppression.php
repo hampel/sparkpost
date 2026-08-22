@@ -25,9 +25,11 @@ use Psr\Log\NullLogger;
  * suppression is still there and the mail silently does not send. Nothing in the sending
  * path reports that - it is not an error, the message is simply dropped.
  *
- * Inserting is deliberately absent. Putting an address ON the list expresses a policy about
- * who may be emailed, and that belongs to the application; the two operations here are
- * about SparkPost's own state.
+ * add() exists for the third case - putting an address on deliberately - and is mostly
+ * there so the two above can be exercised against the real API without touching an entry
+ * SparkPost put there itself. Driving application policy through it, mirroring every
+ * unsubscribe into SparkPost, is a decision for the application rather than something this
+ * class encourages.
  */
 final class Suppression
 {
@@ -107,6 +109,38 @@ final class Suppression
     public function isSuppressed(string $recipient): bool
     {
         return $this->find($recipient) !== null;
+    }
+
+    /**
+     * Put an address on the list.
+     *
+     * This is a PUT and therefore an upsert: an address already on the list has its entry
+     * replaced rather than being rejected, so check with isSuppressed() first if you would
+     * rather not overwrite what SparkPost recorded for it.
+     *
+     * **The list is eventually consistent.** Measured against the live API on 22 August
+     * 2026, an added address took around six seconds to become readable, and a deleted one
+     * stayed readable for a similar stretch after the delete succeeded. add() returning true
+     * means SparkPost accepted the write, not that isSuppressed() will agree yet. Nothing
+     * here retries on your behalf - a caller that needs to see the change has to poll, and
+     * hiding that behind a sleep would make every genuine miss slow.
+     *
+     * `list_id` is not exposed: it addresses SparkPost's own mailing lists, which nothing
+     * using this package has.
+     */
+    public function add(string $recipient, string $description = '', bool $transactional = true): bool
+    {
+        $payload = ['type' => $transactional ? 'transactional' : 'non_transactional'];
+
+        if ($description !== '') {
+            $payload['description'] = $description;
+        }
+
+        $this->logger->debug('SparkPost suppression add', ['recipient' => $recipient] + $payload);
+
+        $this->connection->put('suppression-list/' . rawurlencode($recipient), $payload);
+
+        return true;
     }
 
     /**

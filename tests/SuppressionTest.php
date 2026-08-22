@@ -220,4 +220,38 @@ final class SuppressionTest extends TestCase
         $this->assertCount(1, $seen);
         $this->assertCount(2, $this->client->requests);
     }
+    public function test_add_puts_the_recipient_with_a_transactional_type(): void
+    {
+        $this->client->pushJson(200, ['results' => ['message' => 'Suppression list successfully updated']]);
+
+        $this->assertTrue($this->sparkpost()->suppression()->add('new@example.com', 'added by hand'));
+
+        $request = $this->client->lastRequest();
+
+        $this->assertSame('PUT', $request->getMethod());
+        $this->assertSame('/api/v1/suppression-list/new%40example.com', $request->getUri()->getPath());
+        $this->assertSame(
+            ['type' => 'transactional', 'description' => 'added by hand'],
+            $this->sentBody()
+        );
+    }
+
+    public function test_add_can_mark_an_address_non_transactional(): void
+    {
+        $this->client->pushJson(200, ['results' => ['message' => 'ok']]);
+
+        $this->sparkpost()->suppression()->add('new@example.com', transactional: false);
+
+        // no description key at all rather than an empty one - SparkPost keeps what it is
+        // given, and a blank description is worse than none
+        $this->assertSame(['type' => 'non_transactional'], $this->sentBody());
+    }
+
+    public function test_a_failed_add_throws(): void
+    {
+        $this->client->pushJson(422, ['errors' => [['message' => 'Invalid recipient']]]);
+
+        $this->expectException(ClientException::class);
+        $this->sparkpost()->suppression()->add('not-an-address');
+    }
 }

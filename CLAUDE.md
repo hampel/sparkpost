@@ -196,9 +196,22 @@ field this class has not grown yet is still reachable.
 past a kilobyte of base64 and a suppression list is small; there is no stop-and-resume caller
 here of the kind that made `EventCursor` a string.
 
-**Inserting is deliberately absent.** Putting an address on the list expresses a policy about
-who may be emailed, and that belongs to the application — same reasoning that keeps bounce
-policy out of `BounceClass`.
+**`add()` is a PUT and therefore an upsert**, and exists mainly so `find()` and `delete()` can
+be exercised against the real API without touching an entry SparkPost put there itself. Whether
+an application mirrors its own unsubscribes onto SparkPost's list is policy, and stays with the
+application — the same reasoning that keeps bounce policy out of `BounceClass`. `list_id` is not
+exposed: it addresses SparkPost's own mailing lists, which nothing using this package has.
+
+**The list is eventually consistent, and it is not subtle.** Measured against the live API on
+22 August 2026: an added address took ~6–7s to become readable, and a deleted one stayed
+readable for about as long after the delete returned success. Nothing in the resource retries or
+sleeps — hiding it would make every genuine miss slow, and a caller that needs to observe the
+change has to poll. `harness/suppression.php` does exactly that, and its round trip is the only
+thing that exercises `add()` and `delete()` for real.
+
+**The harness checks before it creates.** A round trip that added an address which was already
+listed would delete a genuine suppression on the way out — someone else's bounce, removed
+silently. It generates an address at `example.org`, verifies it is absent, then proceeds.
 
 ## Tests
 

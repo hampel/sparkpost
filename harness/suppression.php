@@ -13,10 +13,19 @@
  *   - an address that is not suppressed answers 404, so "this address is fine" arrives as
  *     an error and has to be turned back into a plain no.
  *
- * Reading is safe and happens every run. **Deleting is not**, so it only happens when
- * SPARKPOST_SUPPRESSION_DELETE names the address to remove - deliberate, one address at a
- * time, never inferred. Taking an address off the list means SparkPost will attempt
- * delivery to it again.
+ * Reading is safe and happens every run. **Writing is not**, so it takes an explicit act:
+ *
+ *   SPARKPOST_SUPPRESSION_ROUNDTRIP=1   add, read back and delete an invented address
+ *   SPARKPOST_SUPPRESSION_DELETE=<addr> remove a real one
+ *
+ * The round trip is how delete() gets exercised without touching an entry SparkPost put
+ * there itself, and it checks the address is not already listed before creating it - a
+ * create-then-delete over something real would silently remove a genuine suppression.
+ * Deleting a real address means SparkPost will attempt delivery to it again.
+ *
+ * Note that the list is eventually consistent. A write is accepted several seconds before
+ * it can be read back, and a delete stays readable for about as long afterwards, so the
+ * round trip polls rather than asserting immediately.
  *
  * Needs SPARKPOST_API_KEY.
  *
@@ -82,12 +91,67 @@ $io->value(
 );
 $io->info('The second one is a real 404 from SparkPost, turned back into a plain false.');
 
+// A full add -> read -> delete round trip, on an address invented for the purpose. This is
+// how delete() gets exercised without touching an entry SparkPost put there itself.
+if (getenv('SPARKPOST_SUPPRESSION_ROUNDTRIP') === '1') {
+    $io->line();
+    $io->info('Round trip: add, wait for it to be readable, delete.');
+
+    // example.org is reserved and cannot receive mail, and the random part means this
+    // address has never existed before.
+    $probe = sprintf('sparkpost-harness-%s@example.org', bin2hex(random_bytes(4)));
+    $io->value('address', $probe);
+
+    // Check before creating, always. If this address were somehow already on the list, the
+    // delete at the end would remove a suppression that someone else's bounce put there.
+    if ($suppression->isSuppressed($probe)) {
+        $io->error('Already on the list. Not touching it - a delete here would remove a real entry.');
+
+        exit(1);
+    }
+
+    $suppression->add($probe, 'hampel/sparkpost harness round trip');
+    $io->success('✓ added');
+
+    // The list is eventually consistent: the write is accepted well before it can be read
+    // back. Measured at about six seconds. Poll rather than assume either way.
+    $started = microtime(true);
+    $visible = false;
+
+    for ($attempt = 1; $attempt <= 30; $attempt++) {
+        if ($suppression->isSuppressed($probe)) {
+            $visible = true;
+
+            break;
+        }
+
+        usleep(500_000);
+    }
+
+    $waited = round(microtime(true) - $started, 1);
+
+    if (!$visible) {
+        $io->warn(sprintf('Still not readable after %ss. Deleting anyway.', $waited));
+    } else {
+        $io->success(sprintf('✓ readable after ~%ss', $waited));
+        $io->value('entry', $suppression->find($probe)?->raw);
+    }
+
+    $io->value('delete returned', $suppression->delete($probe) ? 'true' : 'false');
+    $io->value('delete again returned', $suppression->delete($probe) ? 'true' : 'false');
+    $io->info('The second false is the 404 path: nothing to remove is not a failure.');
+    $io->info('isSuppressed() may still say true for a few seconds - the same lag, backwards.');
+
+    exit(0);
+}
+
 $remove = getenv('SPARKPOST_SUPPRESSION_DELETE') ?: null;
 
 if ($remove === null) {
     $io->line();
-    $io->info('Nothing was deleted. Set SPARKPOST_SUPPRESSION_DELETE=<address> to remove one,');
-    $io->info('which lets SparkPost attempt delivery to it again.');
+    $io->info('Nothing was changed. Set SPARKPOST_SUPPRESSION_ROUNDTRIP=1 to add, read back and');
+    $io->info('delete a throwaway address, or SPARKPOST_SUPPRESSION_DELETE=<address> to remove');
+    $io->info('a real one, which lets SparkPost attempt delivery to it again.');
 
     exit(0);
 }

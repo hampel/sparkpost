@@ -61,6 +61,19 @@ final class Connection
     }
 
     /**
+     * @param  array<mixed>  $payload
+     * @return array<mixed>
+     */
+    public function put(string $path, array $payload): array
+    {
+        $request = $this->request('PUT', $path)
+            ->withHeader('Content-Type', 'application/json')
+            ->withBody($this->streamFactory->createStream(self::encode($payload)));
+
+        return $this->send($request);
+    }
+
+    /**
      * SparkPost answers 204 with no body, which decode() turns into an empty array.
      *
      * @return array<mixed>

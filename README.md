@@ -215,8 +215,22 @@ $page->totalCount;
 $page->hasMore;
 ```
 
-Adding an address is deliberately absent. Putting someone *on* the list is a policy about
-who may be emailed, and that belongs in your application.
+Adding one is a `PUT`, and therefore an upsert — an address already listed has its entry
+replaced rather than the call being rejected:
+
+```php
+$suppression->add('someone@example.com', 'asked us to stop');
+$suppression->add('someone@example.com', transactional: false);
+```
+
+**The list is eventually consistent**, which is worth knowing before you write anything
+around it. Measured against the live API: an added address took about six seconds to become
+readable, and a deleted one stayed readable about as long after the delete succeeded. `add()`
+returning true means SparkPost accepted the write, not that `isSuppressed()` agrees yet.
+Nothing here retries for you — poll if you need to see the change.
+
+Whether an unsubscribe in your application should also go on SparkPost's list is a policy
+question, and it is yours rather than this package's.
 
 ## HTTP 200 does not mean the mail was sent
 
