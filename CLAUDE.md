@@ -276,7 +276,7 @@ Namespace is `Hampel\SparkPost\Tests\`, filename suffix `Test.php`.
 
 ## Exercising against the real API
 
-`harness/` holds three `hampel/rig` exercises. They are not tests and assert nothing — they exist
+`harness/` holds five `hampel/rig` exercises. They are not tests and assert nothing — they exist
 for the questions a stub structurally cannot answer.
 
 ```bash
@@ -284,8 +284,13 @@ cp .env.example .env                 # _API_KEY, _TO, _FROM; optional _RETURN_PA
 vendor/bin/rig                       # list them
 vendor/bin/rig send                  # one real transmission, and what came back
 vendor/bin/rig events                # real paging, real event shapes
+vendor/bin/rig suppression           # the links shape and the 404; writes are opt-in
+vendor/bin/rig domains               # sending domains, and the subaccount derived from one
 vendor/bin/rig errors                # needs no key - every call here is meant to fail
 ```
+
+`harness/lib/` is not scanned: rig discovers exercises with `glob('harness/*.php')`, top level
+only, so a shared helper goes one directory down and is `require`d by the exercises that use it.
 
 `send` and `events` answer the only thing worth knowing before a release: whether SparkPost accepts
 the payload `Transmission` builds, and whether its pagination links come back in the shape
@@ -315,6 +320,42 @@ out. That default is inverted from the obvious one on purpose: a session once ra
 missing-credentials guard, not knowing a populated `.env` was already here, and mail went out. An
 opt-in sink flag would not have helped, because a session unaware of the `.env` is equally unaware
 of the flag. Do not flip it to opt-in.
+
+### Three layers, and the two switches that are not interchangeable
+
+The sink default above is the middle one of three, and on its own it protects nobody who matters.
+It is a default, and the `.env` that actually exists on the machine of whoever owns the key
+overrides it — because that person genuinely does want to deliver. So the layers are:
+
+1. **rig withholds the environment file.** `vendor/bin/rig` does not load `.env` at all when
+   `CLAUDECODE` is set, and says so. This is why `hampel/rig` is required at **`^0.2`**: the
+   check arrived in 0.2.0, and a caret constraint on `0.1` cannot reach it. Do not relax that
+   constraint — it is the only layer that works without the harness cooperating.
+2. **the exercise defaults to the harmless thing** — a sink for `send`, read-only for
+   `suppression`.
+3. **the opt-in is itself refused under an agent**, which is what closes the gap in (2).
+
+```
+SPARKPOST_DELIVER=1                      the human's ordinary opt-in; lives in .env
+SPARKPOST_SUPPRESSION_ROUNDTRIP=1        likewise
+SPARKPOST_SUPPRESSION_DELETE=<address>   likewise
+
+SPARKPOST_AGENT_MAY_DELIVER=1            an agent, asked to send for real, this once
+SPARKPOST_AGENT_MAY_WRITE_SUPPRESSION=1  an agent, asked to write to the list, this once
+```
+
+**The second pair never goes in `.env`** — persisted, it recreates exactly the problem it exists
+for. They are deliberately not listed among the assignments in `.env.example` for that reason,
+only described there.
+
+`harness/lib/agent.php` holds the one function both exercises use, and both of its reads fail
+safe: an absent or renamed `CLAUDECODE` falls back to the ordinary opt-in rather than to "assume
+human, proceed", so a rename upstream costs this layer and not the safety. The override is tested
+against exactly `'1'`, because an environment variable is always a string and a loose test makes
+`=0` mean yes.
+
+**Every exercise prints its mode above the work**, not after it, and a sink run says what it did
+not prove. A run that answers nothing and is silent about that reads as a pass.
 
 The cost is that sink runs answer nothing decided at the far end — delivery, `Return-Path`, DMARC —
 and the exercise says so on the way out. `SPARKPOST_DELIVER=1` is the deliberate act that checks

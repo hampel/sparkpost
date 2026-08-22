@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Exercise: read the suppression list, and answer the two questions it exists for.
+ * Exercise: read the live suppression list - and, if asked, add and delete entries on it.
  *
  * The suite drives all of this through a stub, which proves the package handles the shapes
  * correctly. What it cannot prove is that those are the shapes SparkPost sends - and this
@@ -23,6 +23,11 @@
  * create-then-delete over something real would silently remove a genuine suppression.
  * Deleting a real address means SparkPost will attempt delivery to it again.
  *
+ * Both switches are ignored in an agent session unless SPARKPOST_AGENT_MAY_WRITE_SUPPRESSION=1
+ * is passed with them, for the same reason SPARKPOST_DELIVER is ignored in send.php: they
+ * are read from a .env that belongs to whoever owns the key, and an agent would inherit
+ * an authorisation it never asked for. Reading is unaffected and happens either way.
+ *
  * Note that the list is eventually consistent. A write is accepted several seconds before
  * it can be read back, and a delete stays readable for about as long afterwards, so the
  * round trip polls rather than asserting immediately.
@@ -38,6 +43,8 @@ use Hampel\SparkPost\Config;
 use Hampel\SparkPost\Exception\ExceptionInterface;
 use Hampel\SparkPost\SparkPost;
 
+require __DIR__ . '/lib/agent.php';
+
 $io->title('sparkpost · suppression');
 
 $key = getenv('SPARKPOST_API_KEY');
@@ -47,6 +54,25 @@ if ($key === false || $key === '') {
 
     exit(1);
 }
+
+// Both write switches are settled before anything runs, so the mode can be stated above
+// the work rather than discovered from what it did. See harness/lib/agent.php.
+$roundTrip = getenv('SPARKPOST_SUPPRESSION_ROUNDTRIP') === '1';
+$remove = getenv('SPARKPOST_SUPPRESSION_DELETE') ?: null;
+$refused = ($roundTrip || $remove !== null) && harness_agent_refuses('SPARKPOST_AGENT_MAY_WRITE_SUPPRESSION');
+
+if ($refused) {
+    $roundTrip = false;
+    $remove = null;
+}
+
+$io->value('mode', match (true) {
+    $roundTrip => 'ROUND TRIP - will add and then delete an invented address',
+    $remove !== null => 'DELETING ' . $remove . ' - a real entry, for real',
+    $refused => 'read only - the write switches are ignored, this is an agent session',
+    default => 'read only - nothing will be changed',
+});
+$io->line();
 
 $factory = new HttpFactory();
 $sparkpost = new SparkPost(Config::forRegion($key, getenv('SPARKPOST_REGION') ?: null), new Client(), $factory, $factory);
@@ -93,7 +119,7 @@ $io->info('The second one is a real 404 from SparkPost, turned back into a plain
 
 // A full add -> read -> delete round trip, on an address invented for the purpose. This is
 // how delete() gets exercised without touching an entry SparkPost put there itself.
-if (getenv('SPARKPOST_SUPPRESSION_ROUNDTRIP') === '1') {
+if ($roundTrip) {
     $io->line();
     $io->info('Round trip: add, wait for it to be readable, delete.');
 
@@ -145,13 +171,19 @@ if (getenv('SPARKPOST_SUPPRESSION_ROUNDTRIP') === '1') {
     exit(0);
 }
 
-$remove = getenv('SPARKPOST_SUPPRESSION_DELETE') ?: null;
-
 if ($remove === null) {
     $io->line();
     $io->info('Nothing was changed. Set SPARKPOST_SUPPRESSION_ROUNDTRIP=1 to add, read back and');
     $io->info('delete a throwaway address, or SPARKPOST_SUPPRESSION_DELETE=<address> to remove');
     $io->info('a real one, which lets SparkPost attempt delivery to it again.');
+
+    if ($refused) {
+        $io->line();
+        $io->warn('One of those was set and was ignored: an agent is running this.');
+        $io->info('That is the guard working. If you have been asked to write to the list,');
+        $io->info('SPARKPOST_AGENT_MAY_WRITE_SUPPRESSION=1 on the command line says so - and it');
+        $io->info('belongs there rather than in .env, where it would stop being a deliberate act.');
+    }
 
     exit(0);
 }

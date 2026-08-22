@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Exercise: send a real transmission and look at what came back.
+ * Exercise: post a real transmission to SparkPost, and - if asked - deliver it.
  *
  * The suite proves the package handles a response correctly; it cannot tell you whether
  * SparkPost accepts the payload we build, which is the only question that matters before
@@ -33,6 +33,12 @@
  * which is the right way round for a harness whose job is to prove the API client works
  * rather than to deliver mail.
  *
+ * That default is not the whole of it, because the .env this reads belongs to whoever owns
+ * the key and generally says deliver - so an agent inherits an authorisation nobody gave
+ * it. SPARKPOST_DELIVER is therefore ignored in an agent session unless
+ * SPARKPOST_AGENT_MAY_DELIVER=1 is also passed, which is a thing a person types and a
+ * stale configuration file cannot say on their behalf.
+ *
  * Needs SPARKPOST_API_KEY, SPARKPOST_TO, SPARKPOST_FROM. SPARKPOST_RETURN_PATH and
  * SPARKPOST_DELIVER are optional.
  *
@@ -46,6 +52,8 @@ use Hampel\SparkPost\Exception\ExceptionInterface;
 use Hampel\SparkPost\SparkPost;
 use Hampel\SparkPost\Transmission\Address;
 use Hampel\SparkPost\Transmission\Transmission;
+
+require __DIR__ . '/lib/agent.php';
 
 $io->title('sparkpost · send');
 
@@ -74,6 +82,17 @@ $returnPath = getenv('SPARKPOST_RETURN_PATH') ?: null;
 // SPARKPOST_DELIVER=1 vendor/bin/rig send beats whatever the .env says.
 $deliver = getenv('SPARKPOST_DELIVER') === '1';
 
+// And layer three, which is what covers the gap in layer two above. SPARKPOST_DELIVER
+// lives in the .env of whoever owns the key, and it generally says deliver, because that
+// is how they run these - so that default never applies to the file that actually exists.
+// An agent inherits the decision without having made it. CLAUDECODE cannot be faked by a
+// stale .env; see harness/lib/agent.php for why all three layers are here.
+$refused = $deliver && harness_agent_refuses('SPARKPOST_AGENT_MAY_DELIVER');
+
+if ($refused) {
+    $deliver = false;
+}
+
 // The suffix goes on the whole address, local part included.
 $sink = static fn (string $email): string => $email . '.sink.sparkpostmail.com';
 
@@ -84,7 +103,11 @@ $io->value('endpoint', Config::forRegion($key, $region)->resolve('transmissions'
 $io->value('from', $from);
 $io->value('to', $to);
 $io->value('return path', $returnPath ?? '(none - SparkPost picks its own bounce domain)');
-$io->value('mode', $deliver ? 'DELIVERING for real' : 'sink - nothing will be delivered');
+$io->value('mode', match (true) {
+    $deliver => 'DELIVERING for real',
+    $refused => 'sink - SPARKPOST_DELIVER ignored, this is an agent session',
+    default => 'sink - nothing will be delivered',
+});
 $io->line();
 
 $transmission = Transmission::make()
@@ -150,6 +173,14 @@ if (!$deliver) {
     $io->info('Everything above is real - SparkPost parsed and accepted this payload - but');
     $io->info('anything decided at the far end is not answered here. Re-run with');
     $io->info('SPARKPOST_DELIVER=1 to check delivery, Return-Path or DMARC.');
+
+    if ($refused) {
+        $io->line();
+        $io->warn('SPARKPOST_DELIVER was set and was ignored: an agent is running this.');
+        $io->info('That is the guard working. If you have been asked to deliver for real,');
+        $io->info('SPARKPOST_AGENT_MAY_DELIVER=1 on the command line says so - and it belongs');
+        $io->info('there rather than in .env, where it would stop being a deliberate act.');
+    }
 }
 
 if ($returnPath !== null && $deliver) {
