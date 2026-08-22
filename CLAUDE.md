@@ -163,6 +163,43 @@ What an application *does* about each one — disable the account, stop one kind
 format carries no offset, so otherwise the same query means different things depending on where
 the server runs.
 
+## Suppression, and the two shapes that differ from message events
+
+The resource exists for two questions — *is this address suppressed, and why*, and *take it
+off the list* — and both are shaped by how the API answers rather than by what it offers.
+
+**A recipient that is not suppressed is a 404.** So `find()` returns `null` and
+`isSuppressed()` returns `false` by catching `ClientException` and checking for exactly 404.
+Catching `ClientException` broadly would report every address as clear whenever the key was
+wrong, so the status check is the point of that block, not defensiveness around it.
+
+**`links` is not the shape the events endpoint uses**, and nothing about the response makes
+that visible:
+
+```
+events:      "links": {"next": "/api/v1/events/message?..."}
+suppression: "links": [{"href": "...", "rel": "next"}, {"href": "...", "rel": "last"}]
+```
+
+`EventPage::fromResponse()` reads `links['next']`. Against a suppression response that key
+is absent, so it would report one page and stop — indistinguishable from having read the
+whole list. That is why `SuppressionPage` exists rather than reusing `EventPage`, and
+`test_the_events_style_link_object_is_not_mistaken_for_one` pins it from the other side.
+
+**Entries are typed, where events are not.** Not an inconsistency: an event's shape varies
+enormously by type, while every suppression entry has the same fields. `description` is the
+one worth having — SparkPost puts the remote server's own rejection text in it, which is the
+answer to "why is this address not receiving mail". The whole entry is kept on `raw` so a
+field this class has not grown yet is still reachable.
+
+**Paging is by page number**, though the endpoint offers cursors too. The cursor tokens run
+past a kilobyte of base64 and a suppression list is small; there is no stop-and-resume caller
+here of the kind that made `EventCursor` a string.
+
+**Inserting is deliberately absent.** Putting an address on the list expresses a policy about
+who may be emailed, and that belongs to the application — same reasoning that keeps bounce
+policy out of `BounceClass`.
+
 ## Tests
 
 `tests/StubClient.php` is a PSR-18 client that answers from a queue and records requests, so the

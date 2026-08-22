@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+Unreleased
+----------
+
+* add the suppression resource - search, find, isSuppressed and delete
+
 0.1.1 (2026-08-22)
 ------------------
 

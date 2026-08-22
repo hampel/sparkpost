@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Hampel\SparkPost;
 
 use Hampel\SparkPost\Resource\MessageEvents;
+use Hampel\SparkPost\Resource\Suppression;
 use Hampel\SparkPost\Resource\Transmissions;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
@@ -29,6 +30,8 @@ final class SparkPost
 
     private ?MessageEvents $messageEvents = null;
 
+    private ?Suppression $suppression = null;
+
     public function __construct(
         private readonly Config $config,
         ClientInterface $client,
@@ -52,6 +55,11 @@ final class SparkPost
     public function messageEvents(): MessageEvents
     {
         return $this->messageEvents ??= new MessageEvents($this->connection, $this->logger);
+    }
+
+    public function suppression(): Suppression
+    {
+        return $this->suppression ??= new Suppression($this->connection, $this->logger);
     }
 
     /**

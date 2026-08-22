@@ -61,6 +61,16 @@ final class Connection
     }
 
     /**
+     * SparkPost answers 204 with no body, which decode() turns into an empty array.
+     *
+     * @return array<mixed>
+     */
+    public function delete(string $path): array
+    {
+        return $this->send($this->request('DELETE', $path));
+    }
+
+    /**
      * @param  array<string, scalar>  $query
      */
     private function request(string $method, string $path, array $query = []): RequestInterface

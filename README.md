@@ -168,6 +168,56 @@ $class?->classification()->isPermanent();  // whether to stop sending to this ad
 $class?->slug();                           // 'invalid_recipient'
 ```
 
+## Suppression
+
+Two questions, and the API answers both awkwardly enough to be worth wrapping.
+
+```php
+$suppression = $sparkpost->suppression();
+
+if ($suppression->isSuppressed('someone@example.com')) {
+    // SparkPost is dropping mail to this address
+}
+
+$entry = $suppression->find('someone@example.com');
+
+$entry?->source;        // 'Bounce Rule', 'Spam Complaint', 'Manually Added', ...
+$entry?->description;   // the remote server's own words: "550-5.1.1 The email account ..."
+$entry?->created;       // DateTimeImmutable
+$entry?->transactional;
+```
+
+**`find()` returns `null` for an address that is not suppressed**, which is worth stating
+because the API does not: SparkPost answers 404, so "this address is fine" arrives as an
+error. Only the 404 is translated — a 401 from a bad key is still thrown, rather than
+quietly reporting every address as clear.
+
+Removing an entry lets SparkPost attempt delivery again:
+
+```php
+$suppression->delete('someone@example.com');   // false if it was not on the list
+```
+
+That is the operation worth having. SparkPost suppresses on a hard bounce by itself, and
+its list and your own idea of who may be emailed then drift apart — so an address you have
+re-enabled at your end can still be silently dropped at SparkPost's. Nothing in the sending
+path reports it, because it is not an error.
+
+Reading the whole list, a page at a time:
+
+```php
+foreach ($suppression->each() as $entry) {
+    // lazy - stop early and it stops making requests
+}
+
+$page = $suppression->search(page: 1, perPage: 100);
+$page->totalCount;
+$page->hasMore;
+```
+
+Adding an address is deliberately absent. Putting someone *on* the list is a policy about
+who may be emailed, and that belongs in your application.
+
 ## HTTP 200 does not mean the mail was sent
 
 SparkPost returns `200` having accepted zero recipients, so the status code alone will tell
@@ -235,7 +285,7 @@ The same seam is what makes the test suite network-free — see `tests/StubClien
 package has not covered yet is a call away rather than a release away:
 
 ```php
-$body = $sparkpost->connection()->get('suppression-list', ['limit' => 50]);
+$body = $sparkpost->connection()->get('webhooks');
 ```
 
 Paths may be given bare (`transmissions`), with a leading slash, or exactly as SparkPost
