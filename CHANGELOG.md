@@ -1,6 +1,17 @@
 CHANGELOG
 =========
 
+Unreleased
+----------
+
+* nothing here reaches an installed package - `src/` is untouched since 0.3.0
+* harness: print a group of figures with `Io::values()`, which aligns them to the group's
+  own widest label, and require `hampel/rig` at `^1.1` for it
+* CI: the declared-dependencies job runs `composer-require-checker` as well as the dev-free
+  analysis. The analysis cannot see a dependency that arrives transitively, nor a missing
+  `ext-*` - a function from an absent extension is indistinguishable from one from core -
+  which is how `ext-ctype` went undeclared from 0.1.0 to 0.3.0 with that job green
+
 0.3.0 (2026-08-27)
 ------------------
 
