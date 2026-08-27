@@ -88,7 +88,7 @@ try {
 }
 
 $io->success('✓ read the list');
-$io->value('total on the list', $page->totalCount);
+$io->value('total', $page->totalCount);
 $io->value('this page', count($page));
 $io->value('another page', $page->hasMore ? 'yes - rel=next was found' : 'no');
 $io->line();
@@ -104,15 +104,19 @@ foreach ($page as $entry) {
 
 $io->line();
 
-// The 404-is-not-an-error path, both ways round.
+// The 404-is-not-an-error path, both ways round. Labels stay under Io::LABEL_WIDTH (14)
+// so the two answers pad into one column - they are meant to be read against each other,
+// and a longer label gets a single space instead, which puts them at different indents.
 $known = $page->results[0]->recipient ?? null;
 
+$io->info('isSuppressed(), against an address on the list and one that is not:');
+
 if ($known !== null) {
-    $io->value('isSuppressed(a listed address)', $suppression->isSuppressed($known) ? 'true' : 'false');
+    $io->value('on the list', $suppression->isSuppressed($known) ? 'true' : 'false');
 }
 
 $io->value(
-    'isSuppressed(an address that is not)',
+    'not on it',
     $suppression->isSuppressed('definitely-not-on-the-list-9f3a@example.org') ? 'true' : 'false'
 );
 $io->info('The second one is a real 404 from SparkPost, turned back into a plain false.');
@@ -149,11 +153,15 @@ if ($roundTrip) {
 
     try {
         // The list is eventually consistent: the write is accepted well before it can be
-        // read back. Measured at about six seconds. Poll rather than assume either way.
+        // read back. Poll rather than assume either way - and give it room, because the
+        // lag is not stable. Measured at ~6-7s on 22 August 2026 and ~10.3s on the 27th,
+        // against a ceiling that was 15s until the second of those left under five
+        // seconds of headroom. A slower day would have printed the "still not readable"
+        // warning, which reads as a finding about the API rather than about this loop.
         $started = microtime(true);
         $visible = false;
 
-        for ($attempt = 1; $attempt <= 30; $attempt++) {
+        for ($attempt = 1; $attempt <= 60; $attempt++) {
             if ($suppression->isSuppressed($probe)) {
                 $visible = true;
 
@@ -175,8 +183,8 @@ if ($roundTrip) {
         $failure = $e;
     } finally {
         try {
-            $io->value('delete returned', $suppression->delete($probe) ? 'true' : 'false');
-            $io->value('delete again returned', $suppression->delete($probe) ? 'true' : 'false');
+            $io->value('delete', $suppression->delete($probe) ? 'true' : 'false');
+            $io->value('delete again', $suppression->delete($probe) ? 'true' : 'false');
             $io->info('The second false is the 404 path: nothing to remove is not a failure.');
         } catch (ExceptionInterface $cleanup) {
             // Loud, and naming the address, because nothing else will ever mention it again.
@@ -242,4 +250,4 @@ if ($removed) {
     $io->warn('It was not on the list. That is a false, not a failure.');
 }
 
-$io->value('isSuppressed now', $suppression->isSuppressed($remove) ? 'true' : 'false');
+$io->value('isSuppressed', $suppression->isSuppressed($remove) ? 'true' : 'false');

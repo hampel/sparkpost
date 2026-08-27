@@ -202,9 +202,12 @@ an application mirrors its own unsubscribes onto SparkPost's list is policy, and
 application — the same reasoning that keeps bounce policy out of `BounceClass`. `list_id` is not
 exposed: it addresses SparkPost's own mailing lists, which nothing using this package has.
 
-**The list is eventually consistent, and it is not subtle.** Measured against the live API on
-22 August 2026: an added address took ~6–7s to become readable, and a deleted one stayed
-readable for about as long after the delete returned success. Nothing in the resource retries or
+**The list is eventually consistent, and it is not subtle.** Measured against the live API: an
+added address took ~6–7s to become readable on 22 August 2026 and ~10.3s on the 27th, and a
+deleted one stays readable for about as long after the delete returns success. Treat the figure
+as an order of magnitude rather than a constant — the harness polls for 30s because the second
+measurement left under five seconds of headroom under the 15s ceiling it had, and a loop that
+gives up prints a warning that reads as a finding about SparkPost rather than about the loop. Nothing in the resource retries or
 sleeps — hiding it would make every genuine miss slow, and a caller that needs to observe the
 change has to poll. `harness/suppression.php` does exactly that, and its round trip is the only
 thing that exercises `add()` and `delete()` for real.
@@ -315,9 +318,13 @@ numbers settles this, and a test cannot, because asserting on the comparison wou
 knowing the answer being looked for.
 
 Run against the live API on 27 August 2026: 36 events in the window, 0 with an impossible
-recipient, so the filter is being applied. Keep both labels under 14 characters — `Io::value()`
-pads a shorter label into a column and gives a longer one a single space, and two figures at
-different indents defeat the only thing the probe asks anyone to do.
+recipient, so the filter is being applied.
+
+**Keep every `Io::value()` label in `harness/` under 14 characters.** Below `Io::LABEL_WIDTH`
+a label is padded into a column; at or over it, `value()` emits a single space instead and the
+figures land at different indents. That is invisible until someone runs the exercise, and it
+matters most exactly where the output is a pair meant to be read against each other — this
+probe's two counts, and `suppression`'s two `isSuppressed()` answers, both of which had it.
 
 `SPARKPOST_RETURN_PATH` is what exercises the envelope FROM, and it is there because bounce handling
 and DMARC are decided somewhere no test can reach. The envelope address takes the bounces and is
