@@ -327,11 +327,18 @@ knowing the answer being looked for.
 Run against the live API on 27 August 2026: 36 events in the window, 0 with an impossible
 recipient, so the filter is being applied.
 
-**Keep every `Io::value()` label in `harness/` under 14 characters.** Below `Io::LABEL_WIDTH`
-a label is padded into a column; at or over it, `value()` emits a single space instead and the
-figures land at different indents. That is invisible until someone runs the exercise, and it
-matters most exactly where the output is a pair meant to be read against each other — this
-probe's two counts, and `suppression`'s two `isSuppressed()` answers, both of which had it.
+**Print a group that is meant to be compared with `Io::values()`, not a run of `value()`
+calls.** `value()` pads to one fixed column, `Io::LABEL_WIDTH`, so a label of 14 characters or
+more keeps its line but loses the column and the figures land at ragged indents — which defeats
+the only thing this probe asks anyone to do. `values()` takes the whole group and aligns it to
+its own widest label, so the labels can say what they mean. That is why `hampel/rig` is
+constrained to **`^1.1`**: `values()` arrived there, and `^1.0` resolves to a rig without it.
+
+Two exceptions worth knowing. A single value is just a group of one, so `value()` stays fine
+for anything not being compared. And **do not use `values()` where an earlier item can throw
+before a later one is computed** — it builds the whole array before printing, so a throw loses
+the results already gathered. The two deletes in `suppression`'s round trip are two `value()`
+calls for exactly that reason, and say so in a comment.
 
 `SPARKPOST_RETURN_PATH` is what exercises the envelope FROM, and it is there because bounce handling
 and DMARC are decided somewhere no test can reach. The envelope address takes the bounces and is

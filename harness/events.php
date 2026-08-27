@@ -124,11 +124,13 @@ try {
     exit(1);
 }
 
-// Both labels are kept under Io::LABEL_WIDTH (14) so the two numbers pad into the same
-// column. Over that, value() emits a single space and the figures land at different
-// indents - which defeats the one thing this probe asks a person to do.
-$io->value('unfiltered', $everything ?? 'not reported');
-$io->value('filtered', $filtered ?? 'not reported');
+// values() rather than two value() calls: it aligns a group to its own widest label, so
+// these can say what they mean instead of being cut to fit value()'s fixed column. The
+// two figures landing in one column is the whole of what this probe asks a person to do.
+$io->values([
+    'events in the window' => $everything ?? 'not reported',
+    'with an impossible recipient' => $filtered ?? 'not reported',
+]);
 
 if ($everything === null || $filtered === null) {
     $io->warn('SparkPost did not return total_count, so there is nothing to compare. That is');

@@ -88,9 +88,11 @@ try {
 }
 
 $io->success('✓ read the list');
-$io->value('total', $page->totalCount);
-$io->value('this page', count($page));
-$io->value('another page', $page->hasMore ? 'yes - rel=next was found' : 'no');
+$io->values([
+    'total on the list' => $page->totalCount,
+    'this page' => count($page),
+    'another page' => $page->hasMore ? 'yes - rel=next was found' : 'no',
+]);
 $io->line();
 
 foreach ($page as $entry) {
@@ -104,21 +106,21 @@ foreach ($page as $entry) {
 
 $io->line();
 
-// The 404-is-not-an-error path, both ways round. Labels stay under Io::LABEL_WIDTH (14)
-// so the two answers pad into one column - they are meant to be read against each other,
-// and a longer label gets a single space instead, which puts them at different indents.
+// The 404-is-not-an-error path, both ways round. One values() call rather than two
+// value()s: these are meant to be read against each other, and values() aligns a group to
+// its own widest label, so they can be written as the calls they are.
 $known = $page->results[0]->recipient ?? null;
 
-$io->info('isSuppressed(), against an address on the list and one that is not:');
+$answers = [];
 
 if ($known !== null) {
-    $io->value('on the list', $suppression->isSuppressed($known) ? 'true' : 'false');
+    $answers['isSuppressed(a listed address)'] = $suppression->isSuppressed($known) ? 'true' : 'false';
 }
 
-$io->value(
-    'not on it',
-    $suppression->isSuppressed('definitely-not-on-the-list-9f3a@example.org') ? 'true' : 'false'
-);
+$answers['isSuppressed(an address that is not)'] =
+    $suppression->isSuppressed('definitely-not-on-the-list-9f3a@example.org') ? 'true' : 'false';
+
+$io->values($answers);
 $io->info('The second one is a real 404 from SparkPost, turned back into a plain false.');
 
 // A full add -> read -> delete round trip, on an address invented for the purpose. This is
@@ -183,6 +185,10 @@ if ($roundTrip) {
         $failure = $e;
     } finally {
         try {
+            // Two value() calls and deliberately not one values(): values() builds its
+            // array before it prints anything, so if the second delete threw, the first
+            // one's result would never reach the screen - and "the first delete worked"
+            // is exactly what you need to know at that point.
             $io->value('delete', $suppression->delete($probe) ? 'true' : 'false');
             $io->value('delete again', $suppression->delete($probe) ? 'true' : 'false');
             $io->info('The second false is the 404 path: nothing to remove is not a failure.');
