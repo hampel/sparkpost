@@ -1,8 +1,8 @@
 CHANGELOG
 =========
 
-Unreleased
-----------
+0.3.0 (2026-08-27)
+------------------
 
 * declare `ext-ctype`, which was used and not required - `ApiException` reads the
   `Retry-After` header with `ctype_digit()`, and ctype is a separable extension that trimmed
