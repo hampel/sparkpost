@@ -124,8 +124,11 @@ try {
     exit(1);
 }
 
-$io->value('events in the window', $everything ?? 'not reported');
-$io->value('with an impossible recipient', $filtered ?? 'not reported');
+// Both labels are kept under Io::LABEL_WIDTH (14) so the two numbers pad into the same
+// column. Over that, value() emits a single space and the figures land at different
+// indents - which defeats the one thing this probe asks a person to do.
+$io->value('unfiltered', $everything ?? 'not reported');
+$io->value('filtered', $filtered ?? 'not reported');
 
 if ($everything === null || $filtered === null) {
     $io->warn('SparkPost did not return total_count, so there is nothing to compare. That is');

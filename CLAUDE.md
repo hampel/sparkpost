@@ -314,6 +314,11 @@ counts. Two numbers that match is the failure. It still asserts nothing — a pe
 numbers settles this, and a test cannot, because asserting on the comparison would mean already
 knowing the answer being looked for.
 
+Run against the live API on 27 August 2026: 36 events in the window, 0 with an impossible
+recipient, so the filter is being applied. Keep both labels under 14 characters — `Io::value()`
+pads a shorter label into a column and gives a longer one a single space, and two figures at
+different indents defeat the only thing the probe asks anyone to do.
+
 `SPARKPOST_RETURN_PATH` is what exercises the envelope FROM, and it is there because bounce handling
 and DMARC are decided somewhere no test can reach. The envelope address takes the bounces and is
 what SPF authenticates; the header From is what DMARC aligns against.
