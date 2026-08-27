@@ -1,6 +1,22 @@
 CHANGELOG
 =========
 
+Unreleased
+----------
+
+* nothing here reaches an installed package - `src/` is untouched since 0.2.0, and every
+  file below is either development-only or `export-ignore`d out of the dist archive
+* require `hampel/rig` at `^1.0` for the harness, up from `^0.1.2` - rig withholds the
+  environment file from an agent session, which arrived in 0.2.0, and a caret constraint
+  below the release that introduces something can never reach it
+* harness: refuse a real delivery or a suppression write under an agent session, whatever
+  the environment file says
+* harness: check that SparkPost still honours the message-events recipient filter, by asking
+  twice over one window and printing both counts - a filter the API stops recognising is
+  dropped silently and answers 200, which no stub can catch
+* harness: the suppression round trip now deletes its throwaway address in a `finally`, and
+  exits non-zero if that delete fails
+
 0.2.0 (2026-08-22)
 ------------------
 
