@@ -228,6 +228,13 @@ already answers *which* subaccount an address belongs to, which was the useful h
 listed would delete a genuine suppression on the way out — someone else's bounce, removed
 silently. It generates an address at `example.org`, verifies it is absent, then proceeds.
 
+It then deletes in a `finally`, because the probes between the add and the delete are live calls
+that can throw, and a throw that skipped the delete would leave a real suppression list carrying an
+address nobody knows is there. The `exit()` is deliberately outside that block: **PHP does not run
+`finally` on `exit()`**, so an exit inside it would quietly undo the whole thing. A cleanup that
+fails anyway says so loudly, names the address, and exits non-zero — the messages are what a
+person reads, but the exit code is what they skim, and a run that left litter is not a pass.
+
 ## Sending domains exist for one field
 
 `SendingDomains` is read-only and always will be: writing there changes where an account's
@@ -297,6 +304,16 @@ the payload `Transmission` builds, and whether its pagination links come back in
 `EventCursor` expects. `errors` needs no credentials — an invalid key gets a real 401 or 403, and an
 unroutable host produces a genuine `RequestException`.
 
+**`events` also probes for the failure that arrives as a success.** Every query parameter the
+package sends is a factual claim about SparkPost's API, and a claim that stops being true does not
+come back as an error — an unrecognised filter is dropped and the call returns 200 with the whole
+account in it. The stub cannot catch that, because it is built from the same assumption the query
+builder is: both stay agreed with each other and wrong about SparkPost. So the exercise asks twice
+over one window, once unfiltered and once for a recipient that has never existed, and prints both
+counts. Two numbers that match is the failure. It still asserts nothing — a person reading two
+numbers settles this, and a test cannot, because asserting on the comparison would mean already
+knowing the answer being looked for.
+
 `SPARKPOST_RETURN_PATH` is what exercises the envelope FROM, and it is there because bounce handling
 and DMARC are decided somewhere no test can reach. The envelope address takes the bounces and is
 what SPF authenticates; the header From is what DMARC aligns against.
@@ -328,9 +345,12 @@ It is a default, and the `.env` that actually exists on the machine of whoever o
 overrides it — because that person genuinely does want to deliver. So the layers are:
 
 1. **rig withholds the environment file.** `vendor/bin/rig` does not load `.env` at all when
-   `CLAUDECODE` is set, and says so. This is why `hampel/rig` is required at **`^0.2`**: the
-   check arrived in 0.2.0, and a caret constraint on `0.1` cannot reach it. Do not relax that
-   constraint — it is the only layer that works without the harness cooperating.
+   `CLAUDECODE` is set, and says so. Do not relax the `hampel/rig` constraint — this is the
+   only layer that works without the harness cooperating, and a caret below the release that
+   introduced something can never reach it. The check arrived in 0.2.0, so `^0.1` could not
+   see it; `^0.2` then could not see 1.0.0 either, and `composer update` never says so. The
+   constraint is **`^1.0`** for that reason: above 1.0 a caret takes the next minor, which is
+   what leaving 0.x bought.
 2. **the exercise defaults to the harmless thing** — a sink for `send`, read-only for
    `suppression`.
 3. **the opt-in is itself refused under an agent**, which is what closes the gap in (2).

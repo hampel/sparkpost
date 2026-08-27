@@ -139,33 +139,69 @@ if ($roundTrip) {
     $suppression->add($probe, 'hampel/sparkpost harness round trip');
     $io->success('✓ added');
 
-    // The list is eventually consistent: the write is accepted well before it can be read
-    // back. Measured at about six seconds. Poll rather than assume either way.
-    $started = microtime(true);
-    $visible = false;
+    // From here to the delete, every line is a live call that can throw - and a throw that
+    // skipped the delete would leave this address sitting on a real suppression list with
+    // nobody aware it was ever put there. So the delete goes in a finally. Note that the
+    // exit() is outside it: PHP does not run finally blocks on exit(), which would undo the
+    // whole point of writing one.
+    $failure = null;
+    $leaked = false;
 
-    for ($attempt = 1; $attempt <= 30; $attempt++) {
-        if ($suppression->isSuppressed($probe)) {
-            $visible = true;
+    try {
+        // The list is eventually consistent: the write is accepted well before it can be
+        // read back. Measured at about six seconds. Poll rather than assume either way.
+        $started = microtime(true);
+        $visible = false;
 
-            break;
+        for ($attempt = 1; $attempt <= 30; $attempt++) {
+            if ($suppression->isSuppressed($probe)) {
+                $visible = true;
+
+                break;
+            }
+
+            usleep(500_000);
         }
 
-        usleep(500_000);
+        $waited = round(microtime(true) - $started, 1);
+
+        if (!$visible) {
+            $io->warn(sprintf('Still not readable after %ss. Deleting anyway.', $waited));
+        } else {
+            $io->success(sprintf('✓ readable after ~%ss', $waited));
+            $io->value('entry', $suppression->find($probe)?->raw);
+        }
+    } catch (ExceptionInterface $e) {
+        $failure = $e;
+    } finally {
+        try {
+            $io->value('delete returned', $suppression->delete($probe) ? 'true' : 'false');
+            $io->value('delete again returned', $suppression->delete($probe) ? 'true' : 'false');
+            $io->info('The second false is the 404 path: nothing to remove is not a failure.');
+        } catch (ExceptionInterface $cleanup) {
+            // Loud, and naming the address, because nothing else will ever mention it again.
+            $leaked = true;
+            $io->error('✗ CLEANUP FAILED - ' . $cleanup::class);
+            $io->value('message', $cleanup->getMessage());
+            $io->error(sprintf('Remove %s from the suppression list by hand.', $probe));
+        }
     }
 
-    $waited = round(microtime(true) - $started, 1);
-
-    if (!$visible) {
-        $io->warn(sprintf('Still not readable after %ss. Deleting anyway.', $waited));
-    } else {
-        $io->success(sprintf('✓ readable after ~%ss', $waited));
-        $io->value('entry', $suppression->find($probe)?->raw);
+    if ($failure !== null) {
+        $io->line();
+        $io->error('✗ ' . $failure::class);
+        $io->value('message', $failure->getMessage());
+        $io->info($leaked
+            ? 'And the delete failed as well, so the address is still on the list.'
+            : 'The address above was still deleted - that is what the finally is for.');
     }
 
-    $io->value('delete returned', $suppression->delete($probe) ? 'true' : 'false');
-    $io->value('delete again returned', $suppression->delete($probe) ? 'true' : 'false');
-    $io->info('The second false is the 404 path: nothing to remove is not a failure.');
+    // A leak exits non-zero even when the probes themselves were fine. The messages above
+    // are loud, but a zero exit is what a person skims for, and this run left litter.
+    if ($failure !== null || $leaked) {
+        exit(1);
+    }
+
     $io->info('isSuppressed() may still say true for a few seconds - the same lag, backwards.');
 
     exit(0);
