@@ -249,6 +249,13 @@ subaccount API key cannot read the subaccounts endpoint at all** — that is not
 grant, SparkPost has no such permission for a subaccount key, confirmed on a real one. The
 sending domain is therefore the only route from an address to the subaccount it belongs to.
 
+Confirmed against live data on 27 August 2026, from three directions that agree: `forAddress()`
+on a real From returned the same subaccount a suppression entry carries, and the envelope
+addresses in the events output embed that same number, on the domain this resource reports as
+the default bounce domain. Note also that all nine domains a subaccount key can see belong to
+that subaccount — more evidence for the `X-MSYS-SUBACCOUNT` decision above, since the key is
+already answering the question the header would ask.
+
 **The single-domain response is not the same shape as a list row.** The list gives `domain`;
 `GET /sending-domains/{domain}` omits it, because it is in the URL, and adds `dkim`. So
 `SendingDomain::fromArray()` takes the requested domain as a second argument — without it,
