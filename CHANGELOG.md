@@ -4,8 +4,12 @@ CHANGELOG
 Unreleased
 ----------
 
-* nothing here reaches an installed package - `src/` is untouched since 0.2.0, and every
-  file below is either development-only or `export-ignore`d out of the dist archive
+* declare `ext-ctype`, which was used and not required - `ApiException` reads the
+  `Retry-After` header with `ctype_digit()`, and ctype is a separable extension that trimmed
+  builds do drop. Without the declaration a host that cannot run the code installs anyway and
+  fatals on an undefined function, on the path that handles an API error
+* nothing else here reaches an installed package - `src/` is untouched since 0.2.0, and the
+  remaining files are development-only or `export-ignore`d out of the dist archive
 * require `hampel/rig` at `^1.0` for the harness, up from `^0.1.2` - rig withholds the
   environment file from an agent session, which arrived in 0.2.0, and a caret constraint
   below the release that introduces something can never reach it
