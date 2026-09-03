@@ -154,19 +154,43 @@ either a type that hides most of the payload or twenty of them.
 
 ### Bounce classes
 
-SparkPost reports why a message bounced as a numeric class. What to *do* about each one is
-your policy, but the codes and what they mean are SparkPost's:
+SparkPost reports why a message bounced as a numeric class. The codes and their meanings
+are SparkPost's; what to *do* about each one is your policy:
 
 ```php
 use Hampel\SparkPost\MessageEvent\BounceClass;
+use Hampel\SparkPost\MessageEvent\BounceClassification;
 
 // note the cast: SparkPost sends bounce_class as a string, and may add codes later
 $class = BounceClass::tryFrom((int) ($event['bounce_class'] ?? 0));
 
-$class?->classification();                 // Hard, Soft, Block, Admin, Undetermined
+$class?->classification();                 // Hard, Soft, Block, Admin, Informational, Undetermined
 $class?->classification()->isPermanent();  // whether to stop sending to this address
 $class?->slug();                           // 'invalid_recipient'
 ```
+
+**Not everything on the bounce channel is a bounce**, and this is the one thing worth
+reading before you write the `match`. Two classes describe a message that *arrived* and
+drew a reply: `auto_reply` (60), and `subscribe` (80), which is someone opting back in.
+Both are `Informational`:
+
+```php
+match ($class?->classification()) {
+    BounceClassification::Hard  => $this->stopSending($user),
+    BounceClassification::Block,
+    BounceClassification::Admin => $this->investigate($user),
+    BounceClassification::Soft  => $this->countTowardsRetries($user),
+
+    // delivered, and answered - a resubscribe is good news, not a failure
+    BounceClassification::Informational => $this->note($event),
+
+    default => null,
+};
+```
+
+`Informational` is this package's grouping rather than SparkPost's own: their table files
+60 under soft and 80 under admin, which describes the SMTP exchange accurately and sends
+the obvious `match` arm off to punish a user who has just opted in.
 
 ## Suppression
 

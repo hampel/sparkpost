@@ -4,7 +4,24 @@ CHANGELOG
 Unreleased
 ----------
 
-* nothing here reaches an installed package - `src/` is untouched since 0.3.0
+**This is a breaking change, so it is 0.4.0 rather than 0.3.1**, and it has to be released
+before 1.0.0 rather than after: adding a case to `BounceClassification` makes an exhaustive
+`match` over that enum in a consumer throw `UnhandledMatchError`, and two bounce classes
+change the classification they report.
+
+* add `BounceClassification::Informational`, and reclassify `AutoReply` (60) and
+  `Subscribe` (80) onto it, from `Soft` and `Admin` respectively. Both describe a message
+  that was *delivered* and then drew a reply, so filing them with the failures meant the
+  obvious `match ($class->classification())` reached a punitive arm for a recipient who
+  had just opted in. This grouping is ours, not SparkPost's - see the enum's own docblock
+* `Unsubscribe` (90) deliberately stays `Hard` although it also describes a delivered
+  message: `isPermanent()` is what a consumer acts on, and "stop sending to this address"
+  is the right consequence for an opt-out. Pinned by a test
+* `BounceClass` cited a bounce-classification-codes URL that now redirects to bird.com and
+  no longer carries the table. The docblock says so, and points at the coarser rollup that
+  replaced it, with a warning that it is not the same table - it omits four of the codes
+* `RateLimitException` says that its empty body is not an empty type, and names the four
+  properties it inherits from `ApiException`
 * harness: print a group of figures with `Io::values()`, which aligns them to the group's
   own widest label, and require `hampel/rig` at `^1.1` for it
 * CI: the declared-dependencies job runs `composer-require-checker` as well as the dev-free

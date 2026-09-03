@@ -159,6 +159,28 @@ means either a lowest-common-denominator type that hides most of the payload, or
 What an application *does* about each one — disable the account, stop one kind of email, ignore it
 — is that application's policy and belongs to it. Resist requests to put that here.
 
+**`BounceClassification::Informational` is the one deliberate exception, and it is not a policy.**
+Two bounce classes describe a message that was *delivered* and then drew a reply — `AutoReply` (60)
+and `Subscribe` (80) — and SparkPost files them under `soft` and `admin` respectively, alongside
+real failures. That is faithful to the SMTP exchange and actively misleading downstream: the
+obvious `match ($class->classification())` then reaches a punitive arm for someone who has just
+opted in. The XenForo add-on hit exactly that, and had to carry its own carve-out plus a test
+named after the trap.
+
+The line that keeps the position above intact: *"did this message reach the recipient?"* is a fact
+about the taxonomy, and only this package is positioned to answer it for all 21 codes. *"Should I
+disable this account?"* is still policy and still belongs to the caller. `Informational` answers
+only the first.
+
+`Unsubscribe` (90) describes a delivered message too and is **deliberately not** `Informational`.
+`isPermanent()` is what a consumer acts on, and "stop sending to this address" is right for an
+opt-out — so reclassifying it would be accurate about the delivery and wrong about the
+consequence. `test_unsubscribe_stays_hard_though_the_message_was_delivered` pins it so a tidy-up
+towards consistency has to argue with a failing test.
+
+`ChallengeResponse` (100) stays `Soft`, and was checked rather than assumed: the mailbox held the
+message pending a challenge nobody answered, so it reached no one. Bird's current table agrees.
+
 `from` and `to` are converted to UTC rather than formatted as they stand: SparkPost's datetime
 format carries no offset, so otherwise the same query means different things depending on where
 the server runs.

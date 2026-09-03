@@ -47,6 +47,12 @@ enum BounceClass: int
         return match ($this) {
             self::InvalidRecipient,
             self::GenericBounceNoRcpt,
+
+            // Delivered, then opted out - so not a delivery failure, and Informational
+            // would be the honest description of it. It stays Hard because Hard is the
+            // one classification isPermanent() reports true for, and "stop sending to
+            // this address" is exactly the right consequence here. Reclassifying it
+            // would be accurate about the delivery and wrong about what to do next.
             self::Unsubscribe => BounceClassification::Hard,
 
             self::SoftBounce,
@@ -55,8 +61,11 @@ enum BounceClass: int
             self::TooLarge,
             self::Timeout,
             self::GenericBounce,
-            self::AutoReply,
             self::TransientFailure,
+
+            // Challenge-response is a real failure: the mailbox held the message pending
+            // a challenge the sender never answered, so it did not reach anyone. Bird's
+            // current table lists 100 as soft, which agrees.
             self::ChallengeResponse => BounceClassification::Soft,
 
             self::MailBlock,
@@ -66,8 +75,12 @@ enum BounceClass: int
             self::RelayingDenied => BounceClassification::Block,
 
             self::AdminFailure,
-            self::SmartSendSuppression,
-            self::Subscribe => BounceClassification::Admin,
+            self::SmartSendSuppression => BounceClassification::Admin,
+
+            // Both describe a message that arrived and drew a reply, which is why they
+            // are not grouped with the failures. See BounceClassification::Informational.
+            self::AutoReply,
+            self::Subscribe => BounceClassification::Informational,
 
             self::Undetermined => BounceClassification::Undetermined,
         };

@@ -32,8 +32,8 @@ final class BounceClassTest extends TestCase
             'no rcpt is permanent' => [30, BounceClassification::Hard],
             'generic bounce is temporary' => [40, BounceClassification::Soft],
             'spam block' => [51, BounceClassification::Block],
-            'auto reply is temporary' => [60, BounceClassification::Soft],
-            'subscribe is administrative' => [80, BounceClassification::Admin],
+            'auto reply is not a failure' => [60, BounceClassification::Informational],
+            'subscribe is not a failure' => [80, BounceClassification::Informational],
             'unsubscribe is permanent' => [90, BounceClassification::Hard],
             'challenge response is temporary' => [100, BounceClassification::Soft],
         ];
@@ -51,6 +51,51 @@ final class BounceClassTest extends TestCase
         $this->assertTrue(BounceClass::InvalidRecipient->classification()->isPermanent());
         $this->assertFalse(BounceClass::MailboxFull->classification()->isPermanent());
         $this->assertFalse(BounceClass::SpamBlock->classification()->isPermanent());
+        $this->assertFalse(BounceClass::Subscribe->classification()->isPermanent());
+    }
+
+    /**
+     * The whole point of the Informational classification: a consumer writing the obvious
+     * match() over classification() must not be able to reach a punitive arm for a message
+     * that was delivered. Asserting the exact set, rather than the two cases individually,
+     * is what makes a third code arriving here a deliberate act.
+     */
+    public function test_informational_is_exactly_the_classes_describing_a_delivered_message(): void
+    {
+        $informational = array_values(array_filter(
+            BounceClass::cases(),
+            fn (BounceClass $class): bool => $class->classification() === BounceClassification::Informational,
+        ));
+
+        $this->assertSame([BounceClass::AutoReply, BounceClass::Subscribe], $informational);
+    }
+
+    /**
+     * 90 describes a delivered message as well, so Informational would be the honest
+     * reading of the SMTP exchange. It is deliberately Hard anyway: isPermanent() is what
+     * a consumer acts on, and "stop sending to this address" is exactly right for an
+     * opt-out. Pinned so a later tidy-up towards consistency argues with a failing test.
+     */
+    public function test_unsubscribe_stays_hard_though_the_message_was_delivered(): void
+    {
+        $this->assertSame(BounceClassification::Hard, BounceClass::Unsubscribe->classification());
+        $this->assertTrue(BounceClass::Unsubscribe->classification()->isPermanent());
+    }
+
+    /**
+     * The mirror of test_every_class_has_a_classification: a classification nothing maps
+     * to is dead code that reads as a live branch.
+     */
+    public function test_every_classification_is_reachable_from_some_bounce_class(): void
+    {
+        $reached = array_map(
+            fn (BounceClass $class): BounceClassification => $class->classification(),
+            BounceClass::cases(),
+        );
+
+        foreach (BounceClassification::cases() as $classification) {
+            $this->assertContains($classification, $reached, "{$classification->value} is not mapped");
+        }
     }
 
     public function test_it_reports_sparkposts_own_name_for_the_class(): void
