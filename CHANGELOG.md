@@ -1,6 +1,30 @@
 CHANGELOG
 =========
 
+1.0.0 (2026-09-04)
+------------------
+
+**The public API is declared stable.** From here a breaking change means 2.0.0, and Composer
+enforces it: `^1.0` is `>=1.0.0 <2.0.0`, so a consumer writes the constraint once instead of
+enumerating every 0.x minor as a separate compatible range.
+
+* no functional change. `src/` is byte-identical to 0.4.0 - the only commit between the two
+  tags corrects a sentence in `CLAUDE.md`, which is `export-ignore`d and does not reach an
+  installed package. The version number is the whole of this release
+
+**What the promise is being made on**, since a stability declaration is only worth the
+evidence behind it:
+
+* the PSR-18 seam has been driven by the consumer it was designed for. A XenForo add-on
+  adapting `XF\Http\Reader::requestUntrusted()` needed roughly ninety lines and no change to
+  any signature here, which is the question the seam existed to answer and it had never been
+  asked before 0.4.0
+* every resource has been exercised against the live API, not only against the stub
+* the last release found a real defect in a real consumer rather than in review -
+  `BounceClassification::Informational` turned an `UnhandledMatchError` in a production job
+  into a handled case - which is the argument for having held 1.0.0 until a consumer had
+  actually used the API
+
 0.4.0 (2026-09-04)
 ------------------
 
