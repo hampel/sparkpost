@@ -1,13 +1,13 @@
 CHANGELOG
 =========
 
-Unreleased
-----------
+0.4.0 (2026-09-04)
+------------------
 
-**This is a breaking change, so it is 0.4.0 rather than 0.3.1**, and it has to be released
-before 1.0.0 rather than after: adding a case to `BounceClassification` makes an exhaustive
-`match` over that enum in a consumer throw `UnhandledMatchError`, and two bounce classes
-change the classification they report.
+**Breaking, hence 0.4.0 rather than 0.3.1, and released before 1.0.0 rather than after:**
+adding a case to `BounceClassification` makes an exhaustive `match` over that enum in a
+consumer throw `UnhandledMatchError`, and two bounce classes change the classification they
+report.
 
 * add `BounceClassification::Informational`, and reclassify `AutoReply` (60) and
   `Subscribe` (80) onto it, from `Soft` and `Admin` respectively. Both describe a message
