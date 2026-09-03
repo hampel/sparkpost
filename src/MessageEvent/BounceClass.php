@@ -7,11 +7,16 @@ namespace Hampel\SparkPost\MessageEvent;
 /**
  * SparkPost's bounce classification codes.
  *
- * https://support.sparkpost.com/docs/tech-resources/bounce-classification-codes
- *
  * These are SparkPost's own numbers and meanings, which is why they belong here. What an
  * application does about each one - disable the account, stop one kind of email, ignore
  * it - is that application's policy and belongs to it.
+ *
+ * The 21-code table these were taken from was published at
+ * support.sparkpost.com/docs/tech-resources/bounce-classification-codes. That URL now
+ * redirects to bird.com and the table is gone; what replaced it is a coarser rollup at
+ * https://bird.com/docs/guides/email/events#bounce-classification, which agrees with
+ * every classification below that it lists and simply omits 26, 60, 80 and 90. Checked
+ * 2026-09-03 - do not "correct" a case against that page alone, it is not the same table.
  */
 enum BounceClass: int
 {
