@@ -453,5 +453,6 @@ is for.
 
 `CHANGELOG.md` is hand-maintained, newest first, and updated in its own commit before tagging.
 Headings are setext-underlined rather than `##` — `x.y.z (YYYY-MM-DD)` over a row of dashes, matching
-the `Unreleased` section already there — with bullet points below. Simon does his own pushes and
+the released sections already there — with bullet points below. Write the next release's notes under
+a heading of their own as they land; there is no standing `Unreleased` section to accumulate them in. Simon does his own pushes and
 tagging.
