@@ -254,10 +254,12 @@ $suppression->add('someone@example.com', transactional: false);
 ```
 
 **The list is eventually consistent**, which is worth knowing before you write anything
-around it. Measured against the live API: an added address took about six seconds to become
-readable, and a deleted one stayed readable about as long after the delete succeeded. `add()`
+around it. Measured against the live API, an added address took seconds rather than
+milliseconds to become readable, and a deleted one stayed readable about as long after the
+delete succeeded. The lag is not a constant — repeat measurements varied by a factor of two —
+so treat it as an order of magnitude and poll rather than sleeping a fixed interval. `add()`
 returning true means SparkPost accepted the write, not that `isSuppressed()` agrees yet.
-Nothing here retries for you — poll if you need to see the change.
+Nothing here retries for you.
 
 Whether an unsubscribe in your application should also go on SparkPost's list is a policy
 question, and it is yours rather than this package's.

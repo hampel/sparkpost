@@ -118,12 +118,13 @@ final class Suppression
      * replaced rather than being rejected, so check with isSuppressed() first if you would
      * rather not overwrite what SparkPost recorded for it.
      *
-     * **The list is eventually consistent.** Measured against the live API on 22 August
-     * 2026, an added address took around six seconds to become readable, and a deleted one
-     * stayed readable for a similar stretch after the delete succeeded. add() returning true
-     * means SparkPost accepted the write, not that isSuppressed() will agree yet. Nothing
-     * here retries on your behalf - a caller that needs to see the change has to poll, and
-     * hiding that behind a sleep would make every genuine miss slow.
+     * **The list is eventually consistent.** Measured against the live API, an added address
+     * took seconds rather than milliseconds to become readable, and a deleted one stayed
+     * readable for a similar stretch after the delete succeeded. The lag is not a constant -
+     * repeat measurements varied by a factor of two - so treat it as an order of magnitude.
+     * add() returning true means SparkPost accepted the write, not that isSuppressed() will
+     * agree yet. Nothing here retries on your behalf - a caller that needs to see the change
+     * has to poll, and hiding that behind a sleep would make every genuine miss slow.
      *
      * `list_id` is not exposed: it addresses SparkPost's own mailing lists, which nothing
      * using this package has.
