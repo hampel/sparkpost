@@ -285,7 +285,7 @@ find out which subaccount you are operating in:
 ```php
 $domain = $sparkpost->sendingDomains()->forAddress('Support <noreply@mail.example.com>');
 
-$domain?->subaccountId;      // 3629
+$domain?->subaccountId;      // 123
 $domain?->hasSubaccount();   // false for the primary account, which is 0 or absent
 ```
 

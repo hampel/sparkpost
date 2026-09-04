@@ -240,7 +240,7 @@ get added by someone reading SparkPost's documentation and finding it missing.
 Suppression is scoped per subaccount, and SparkPost offers a request header to say which one.
 It is not needed here, because the API key already answers that question: a subaccount key is
 bound to its own subaccount automatically and **ignores the header** — verified on a real one,
-where `X-MSYS-SUBACCOUNT: 0` and `X-MSYS-SUBACCOUNT: 3629` returned byte-identical results.
+where `X-MSYS-SUBACCOUNT: 0` and the key's own subaccount id returned byte-identical results.
 An account-level key would honour it, but the way to manage one subaccount's suppressions is
 to use a key for that subaccount, which SparkPost lets you create for exactly this reason.
 

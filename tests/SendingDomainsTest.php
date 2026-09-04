@@ -13,7 +13,7 @@ final class SendingDomainsTest extends TestCase
      *
      * @return array<string, mixed>
      */
-    private function row(string $domain = 'mail.example.com', int $subaccount = 3629): array
+    private function row(string $domain = 'mail.example.com', int $subaccount = 123): array
     {
         return [
             'creation_time' => '2026-08-12T23:41:18+00:00',
@@ -32,7 +32,7 @@ final class SendingDomainsTest extends TestCase
 
         $this->assertCount(2, $domains);
         $this->assertSame('mail.example.com', $domains[0]->domain);
-        $this->assertSame(3629, $domains[0]->subaccountId);
+        $this->assertSame(123, $domains[0]->subaccountId);
         $this->assertTrue($domains[0]->hasSubaccount());
         $this->assertSame('2026-08-12T23:41:18+00:00', $domains[0]->created?->format('c'));
 
@@ -53,7 +53,7 @@ final class SendingDomainsTest extends TestCase
             'dkim' => ['selector' => 'scph0820', 'signing_domain' => ''],
             'creation_time' => '2026-08-12T23:41:18+00:00',
             'is_default_bounce_domain' => false,
-            'subaccount_id' => 3629,
+            'subaccount_id' => 123,
             'status' => ['ownership_verified' => true],
         ]]);
 
@@ -61,7 +61,7 @@ final class SendingDomainsTest extends TestCase
 
         $this->assertNotNull($domain);
         $this->assertSame('mail.example.com', $domain->domain);
-        $this->assertSame(3629, $domain->subaccountId);
+        $this->assertSame(123, $domain->subaccountId);
         $this->assertSame('scph0820', $domain->dkim['selector'] ?? null);
         $this->assertSame('/api/v1/sending-domains/mail.example.com', $this->client->lastRequest()->getUri()->getPath());
     }

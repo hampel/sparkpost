@@ -23,7 +23,7 @@ final class SuppressionTest extends TestCase
             'description' => '550: 550-5.1.1 The email account that you tried to reach does not exist.',
             'created' => '2021-08-11T00:41:44+00:00',
             'updated' => '2021-08-12T09:00:00+00:00',
-            'subaccount_id' => '3629',
+            'subaccount_id' => '123',
             'transactional' => true,
         ];
     }
@@ -38,7 +38,7 @@ final class SuppressionTest extends TestCase
         $this->assertSame('bounced@example.com', $found->recipient);
         $this->assertSame('Bounce Rule', $found->source);
         $this->assertTrue($found->transactional);
-        $this->assertSame('3629', $found->subaccountId);
+        $this->assertSame('123', $found->subaccountId);
         $this->assertSame('2021-08-11T00:41:44+00:00', $found->created?->format('c'));
         $this->assertStringContainsString('550-5.1.1', $found->description);
 
