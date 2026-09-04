@@ -21,6 +21,18 @@ Unreleased
   SparkPost's payload and carry no promise. Raised by the `sparkpost-transport` session, whose
   own stability surface reaches through `getPrevious()` into this property
 
+* `Transmission::returnPath()` gains a docblock, and it is the only change here that reaches
+  an installed package. It says what the envelope FROM is, that SparkPost does not validate
+  it at post time although it does validate `from()`, and what happens to a value the
+  account is not configured for - it is discarded, the message goes out under the fallback
+  bounce domain, and only the domain ever survives because SparkPost supplies the local part
+* a claim carried since August is corrected in `CLAUDE.md`, `.env.example` and
+  `harness/send.php`: a bogus return path was described as producing mail that never
+  arrives. It does not. The value is discarded and the send proceeds, so a bogus value and
+  an empty one are the same state. The original observation was real but hedged, and the
+  hedge was lost in summary - measured across every combination on a real account, and
+  reported by the `sparkpost-transport` and `comparefunds` sessions
+
 1.0.0 (2026-09-04)
 ------------------
 

@@ -17,9 +17,10 @@
  * receiver runs SPF against, while the header From is what the reader sees and what DMARC
  * aligns against. Note which of the two SparkPost actually polices: the From must be on a
  * configured sending domain or the transmission is rejected, while the return path is not
- * checked at all and a bogus one is accepted. The cost of that shows up as mail that never
- * arrives, on somebody else's server, which is exactly why this is an exercise and not a
- * test.
+ * checked at all - a bogus one is accepted, then discarded, and the message goes out under
+ * the account's fallback bounce domain. So the cost is neither a rejection nor a lost
+ * message: it is that the field silently did nothing, which is visible only in a header on
+ * somebody else's server. Exactly why this is an exercise and not a test.
  *
  * **This delivers nothing unless you ask it to.** Recipients are rewritten to SparkPost's
  * sink domain, which accepts, counts and discards the message while still producing real
@@ -185,14 +186,22 @@ if (!$deliver) {
 
 if ($returnPath !== null && $deliver) {
     $io->line();
-    // Verified 22 August 2026: a bogus return path is accepted (200), while a From on an
-    // unconfigured sending domain is rejected outright. SparkPost checks the two in
-    // different places, and conflating them is what put a wrong claim in these files.
-    // The bogus-return-path message never arrived, so the cost lands downstream instead.
+    // Two claims of different kinds, kept apart on purpose. Read off the API on 22 August
+    // 2026: a bogus return path is accepted (200), while a From on an unconfigured sending
+    // domain is rejected outright - SparkPost checks the two in different places, and
+    // conflating them is what put a wrong claim in these files. Measured on a real account
+    // later, and not reachable from here: a domain the account is not configured for is
+    // discarded and the fallback bounce domain is used instead, so a bogus value and an
+    // empty one end up identical. Only the domain ever survives; the local part is
+    // SparkPost's own id either way.
     $io->info('SparkPost took the return path. That is not proof the domain is anything -');
     $io->info('a bogus one is accepted too, unlike a From on an unconfigured domain, which');
-    $io->info('is rejected outright. It is decided at the far end, so read what arrives:');
-    $io->line('  Return-Path:                 the envelope address, and where a bounce would go');
+    $io->info('is rejected outright, and is then discarded rather than used. It is settled');
+    $io->info('at the far end, so read what arrives:');
+    $io->line('  Return-Path:                 <id>@domain - SparkPost keeps the domain and');
+    $io->line('                               replaces the local part, so an id you did not');
+    $io->line('                               choose is success. A DOMAIN you did not choose');
+    $io->line('                               means yours was discarded for the fallback');
     $io->line('  Authentication-Results: spf  authenticates the envelope domain, not the From');
     $io->line('  Authentication-Results: dmarc  passes only if one of SPF or DKIM aligns with From');
     $io->line();

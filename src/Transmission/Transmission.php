@@ -246,6 +246,28 @@ final class Transmission
         return $this;
     }
 
+    /**
+     * The envelope FROM - where bounces are delivered, and the domain a receiver runs SPF
+     * against. Distinct from the header From set by from(), which is what the reader sees
+     * and what DMARC aligns against.
+     *
+     * SparkPost does not validate this when the transmission is posted, and that asymmetry
+     * catches people out: a from() on a domain that is not a configured sending domain is
+     * rejected outright with a 400, while any return path at all is accepted with a 200.
+     * A 200 therefore says the payload was well formed and nothing about this address.
+     *
+     * What happens to it afterwards was measured on a real account rather than read from
+     * the API, so treat it as reported: a domain the account is not configured for is
+     * silently discarded and the message goes out under the fallback bounce domain - the
+     * account's default, or the subaccount's where the key is a subaccount key, or
+     * sparkpostmail.com where neither is set. A wrong value and no value therefore end up
+     * in exactly the same place, and what the wrong one costs is the appearance of having
+     * configured something.
+     *
+     * Only the domain survives in any case. SparkPost replaces the local part with an
+     * identifier of its own, so 'bounces@example.com' is delivered as '<id>@example.com' -
+     * a local part you did not choose is what success looks like here.
+     */
     public function returnPath(string $returnPath): self
     {
         $this->returnPath = $returnPath;

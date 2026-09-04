@@ -367,11 +367,38 @@ and DMARC are decided somewhere no test can reach. The envelope address takes th
 what SPF authenticates; the header From is what DMARC aligns against.
 
 **SparkPost validates the two sender fields in different places, and conflating them put a wrong
-claim in these files.** Verified 22 August 2026: a `from` address on a domain that is not a
-configured sending domain is rejected outright, while a completely bogus `return_path` is accepted
-with a 200 — and the resulting message then never arrives, blocked downstream where DMARC is the
-likely cause. So acceptance says the payload was well formed and nothing else. Do not restore a
-claim that an unverified bounce domain is refused; that rule belongs to the From address.
+claim in these files.** Read off the API on 22 August 2026: a `from` address on a domain that is not
+a configured sending domain is rejected outright — `HTTP 400 Unconfigured Sending Domain <domain>` —
+while a `return_path` is not validated at post time at all, and a completely bogus one is accepted
+with a 200. So acceptance says the payload was well formed and nothing else. Do not restore a claim
+that an unverified bounce domain is refused; that rule belongs to the From address.
+
+**What SparkPost then does with the value is a different class of claim, and it was measured later.**
+A `return_path` naming a domain the account is not configured for is *discarded*, and the message
+goes out under the fallback — the account's default bounce domain, or the subaccount's where the key
+is a subaccount key, and `sparkpostmail.com` where neither is configured. Only the domain ever
+survives in any case: SparkPost replaces the local part with an identifier of its own, so
+`foo@bounce.example.com` is delivered as `<id>@bounce.example.com`. A local part you did not choose
+is what success looks like. Measured across every combination on a real account by Simon in
+September 2026 and reported here by the `sparkpost-transport` and `comparefunds` sessions — none of
+it is reachable from this package's source, a test or a harness payload, which is why it is recorded
+as reported rather than stated flatly.
+
+**A bogus value and an empty one are therefore the same state**, which is the half that is easy to
+get backwards. What a wrong value costs is not delivery and not alignment — unset is unaligned too.
+It is the appearance of having configured something, and nobody re-examines a setting that looks set.
+
+**This section used to carry `Verified 22 August 2026` over two claims of different kinds, and only
+one of them had been verified.** The 400 and the 200 were read off the API. *"The message then never
+arrives, blocked downstream where DMARC is the likely cause"* was an inference from one uncontrolled
+send with no bounce captured; Simon's own words hedged it — *"or if it did, I haven't yet received
+it"* — and every summary written from them dropped the hedge. It is probably right, since he changed
+the address back to a legitimate domain in the same sitting and the message arrived. But if it is
+right then, bogus and unset being the same state, an empty field would have failed that send
+identically, and what it shows is that DKIM alignment was not carrying that domain on its own that
+afternoon. That is a fact about an account, not about this package. **The remedy for a stamp like
+that is not a fresh date** — it is saying which half was observed and which inferred, so the join
+stays visible.
 
 `send` prints `return_path` from the built payload rather than
 from the variable — it is a top-level field, and putting it under `options` instead is a mistake the
