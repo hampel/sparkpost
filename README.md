@@ -426,10 +426,11 @@ API — `ApiException::$errors`, `ApiException::$body`, and the event arrays fro
 * likewise `$statusCode` (`int`), `$body` (`string`, the raw response) and `$retryAfter`
   (`?int`).
 
-**Not ours to promise:** the keys *inside* each error, and the shape of an event. Those are
-SparkPost's payload, passed through with no reshaping beyond dropping non-array entries. If
-SparkPost renames a field inside `errors[]`, this package will not notice and will not issue
-a major for it.
+**Promised by nobody — not by this package, and not to it:** the keys *inside* each error,
+and the shape of an event. Those are SparkPost's payload, passed through with no reshaping
+beyond dropping non-array entries. If SparkPost renames a field inside `errors[]`, this
+package will not notice and will not issue a major for it, and no version number anywhere
+will have moved. Read them with `??`, as below.
 
 ```php
 // safe: guard on the type, read the property, treat what is inside as untrusted
