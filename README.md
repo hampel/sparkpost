@@ -411,6 +411,40 @@ a silent behaviour change rather than a loud one, so it gets the loud version nu
 moved `AutoReply` (60) and `Subscribe` (80), and was released as a breaking change for that
 reason as much as for the new case.
 
+### Decoded SparkPost data: the container is stable, the contents are not
+
+The same split, in the other place SparkPost's own data crosses into this package's public
+API — `ApiException::$errors`, `ApiException::$body`, and the event arrays from
+`messageEvents()`.
+
+**Stable, and covered by the major version:**
+
+* `$errors` exists on every `ApiException` subclass, is `public readonly`, and is always a
+  list of arrays — `[]` when the response carried no `errors` key or was not JSON at all
+  (a proxy answering with HTML is an expected input here, not an edge case). It is never
+  `null`, so `foreach` over it needs no guard.
+* likewise `$statusCode` (`int`), `$body` (`string`, the raw response) and `$retryAfter`
+  (`?int`).
+
+**Not ours to promise:** the keys *inside* each error, and the shape of an event. Those are
+SparkPost's payload, passed through with no reshaping beyond dropping non-array entries. If
+SparkPost renames a field inside `errors[]`, this package will not notice and will not issue
+a major for it.
+
+```php
+// safe: guard on the type, read the property, treat what is inside as untrusted
+if ($previous instanceof ApiException) {
+    foreach ($previous->errors as $error) {
+        $log->warning($error['message'] ?? 'SparkPost gave no message', $error);
+    }
+}
+```
+
+The rule of thumb across all three carve-outs is the same one: **this package promises the
+shape it built and does not promise the shape SparkPost sent.** Where those meet — an enum
+of SparkPost's codes, an array of SparkPost's errors — the container is ours and the contents
+are theirs.
+
 ## Licence
 
 MIT. See [LICENSE.md](LICENSE.md).

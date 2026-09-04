@@ -15,6 +15,11 @@ Unreleased
   an existing code maps to is still a major - a new case announces itself as an
   `UnhandledMatchError`, while a remapping is silent and changes what an application does to a
   real recipient
+* and it draws the same line for decoded SparkPost data. `ApiException::$errors` is stable as a
+  container - it exists, it is `public readonly`, and it is always a list of arrays, never
+  `null`, so a `foreach` over it needs no guard - while the keys *inside* each error are
+  SparkPost's payload and carry no promise. Raised by the `sparkpost-transport` session, whose
+  own stability surface reaches through `getPrevious()` into this property
 
 1.0.0 (2026-09-04)
 ------------------
