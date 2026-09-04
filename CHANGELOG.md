@@ -1,6 +1,21 @@
 CHANGELOG
 =========
 
+Unreleased
+----------
+
+* README gains a `Versioning and support` section, which is the thing 1.0.0 created and no
+  file stated: `^1.0` is the constraint to write, `~1.0.0` is the mistake that looks like it,
+  1.x is supported and 0.x is not - and upgrading from 0.4.0 is a constraint edit with no code
+  change behind it
+* it also states **what "stable" covers**, because a promise with no stated surface is not one.
+  A break in a class, method or signature means 2.0.0. `BounceClass` and `EventType` are the
+  deliberate exception: they mirror SparkPost's taxonomy, so a code SparkPost adds arrives here
+  in a *minor*, and every `match` over them needs a `default` arm. Changing which classification
+  an existing code maps to is still a major - a new case announces itself as an
+  `UnhandledMatchError`, while a remapping is silent and changes what an application does to a
+  real recipient
+
 1.0.0 (2026-09-04)
 ------------------
 

@@ -451,8 +451,23 @@ is for.
 
 ## Releases
 
+Since 1.0.0 the public API is stable, and that is a promise with a stated shape rather than a
+mood. A breaking change to a class, method or signature in `src/` means **2.0.0**.
+
+**The one carve-out is `BounceClass` and `EventType`, and it is deliberate.** They mirror
+SparkPost's taxonomy, which this package does not control, so a code SparkPost adds appears here
+**in a minor**. The README says so and tells consumers that every `match` over these enums needs a
+`default` arm. Adding a case is therefore not on its own a reason to reach for a major.
+
+**Changing which classification an existing code maps to is a major**, and this is the half worth
+holding: a new case announces itself as an `UnhandledMatchError`, while a remapping is silent and
+changes what an application does to a real recipient. 0.4.0 did both — it added `Informational`
+*and* moved `AutoReply` (60) and `Subscribe` (80) onto it — and the remapping is the part that
+earned the breaking version.
+
 `CHANGELOG.md` is hand-maintained, newest first, and updated in its own commit before tagging.
 Headings are setext-underlined rather than `##` — `x.y.z (YYYY-MM-DD)` over a row of dashes, matching
-the released sections already there — with bullet points below. Write the next release's notes under
-a heading of their own as they land; there is no standing `Unreleased` section to accumulate them in. Simon does his own pushes and
+the released sections already there — with bullet points below. Notes accumulate under an
+`Unreleased` heading as they land, which the release commit renames to `x.y.z (YYYY-MM-DD)`; so
+there is one only while something is waiting, and cutting a release consumes it. Simon does his own pushes and
 tagging.

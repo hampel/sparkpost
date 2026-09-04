@@ -368,6 +368,49 @@ Paths may be given bare (`transmissions`), with a leading slash, or exactly as S
 returns them in pagination links (`/api/v1/events/message?page=2`) — the version prefix is
 handled either way.
 
+## Versioning and support
+
+Semantic versioning. `1.0.0` declares the public API stable, so the constraint to write is:
+
+```json
+"hampel/sparkpost": "^1.0"
+```
+
+That is `>=1.0.0 <2.0.0`. **Write `^1.0`, not `~1.0.0`** — the tilde means `>=1.0.0 <1.1.0`,
+which pins you to patch releases and quietly withholds every additive one. The two look
+interchangeable and are not.
+
+* **PHP 8.3 or later.** Tested against 8.3 (including at the lowest resolvable dependency
+  set) and 8.5.
+* **1.x is supported.** Fixes land on the current minor.
+* **0.x is not, and there is nothing to weigh up.** `src/` is byte-identical between 0.4.0
+  and 1.0.0, so upgrading from 0.4.0 is a constraint edit with no code change behind it.
+  Before that, every 0.x minor was a breaking boundary to Composer, which is the tax `^1.0`
+  removes.
+
+### What "stable" covers, and the one place it deliberately does not
+
+A breaking change to a class, method or method signature in `src/` means `2.0.0`.
+
+**`BounceClass` and `EventType` are the exception, and it is a deliberate one.** They mirror
+SparkPost's own taxonomy, which this package does not control — if SparkPost issues a new
+bounce code, a new case appears here **in a minor release**. So:
+
+**every `match` over one of these enums needs a `default` arm.** That is not defensive
+padding, it is the supported way to use them — see the example under
+[Bounce classes](#bounce-classes), which has one for exactly this reason. Without it, a new
+SparkPost code is a fatal `UnhandledMatchError`.
+
+This is not theoretical. Adding `BounceClassification::Informational` in 0.4.0 turned an
+exhaustive `match` in a real application into a runtime fatal, on a vacation auto-reply, in a
+background job — where the stack trace points at the consumer's code and says nothing about
+an upgrade.
+
+What *does* mean a major: **changing which classification an existing code maps to.** That is
+a silent behaviour change rather than a loud one, so it gets the loud version number. 0.4.0
+moved `AutoReply` (60) and `Subscribe` (80), and was released as a breaking change for that
+reason as much as for the new case.
+
 ## Licence
 
 MIT. See [LICENSE.md](LICENSE.md).
