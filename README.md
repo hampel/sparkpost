@@ -403,10 +403,9 @@ padding, it is the supported way to use them — see the example under
 [Bounce classes](#bounce-classes), which has one for exactly this reason. Without it, a new
 SparkPost code is a fatal `UnhandledMatchError`.
 
-This is not theoretical. Adding `BounceClassification::Informational` in 0.4.0 turned an
-exhaustive `match` in a real application into a runtime fatal, on a vacation auto-reply, in a
-background job — where the stack trace points at the consumer's code and says nothing about
-an upgrade.
+The failure mode is worth picturing: a vacation auto-reply arrives in a background job, the
+`match` has no arm for the new case, and the stack trace points at your own code without
+mentioning an upgrade.
 
 What *does* mean a major: **changing which classification an existing code maps to.** That is
 a silent behaviour change rather than a loud one, so it gets the loud version number. 0.4.0
