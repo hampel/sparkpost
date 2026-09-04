@@ -4,51 +4,30 @@ CHANGELOG
 Unreleased
 ----------
 
-* README gains a `Versioning and support` section, which is the thing 1.0.0 created and no
-  file stated: `^1.0` is the constraint to write, `~1.0.0` is the mistake that looks like it,
-  1.x is supported and 0.x is not - and upgrading from 0.4.0 is a constraint edit with no code
-  change behind it
-* it also states **what "stable" covers**, because a promise with no stated surface is not one.
-  A break in a class, method or signature means 2.0.0. `BounceClass` and `EventType` are the
-  deliberate exception: they mirror SparkPost's taxonomy, so a code SparkPost adds arrives here
-  in a *minor*, and every `match` over them needs a `default` arm. Changing which classification
-  an existing code maps to is still a major - a new case announces itself as an
-  `UnhandledMatchError`, while a remapping is silent and changes what an application does to a
-  real recipient
-* and it draws the same line for decoded SparkPost data. `ApiException::$errors` is stable as a
-  container - it exists, it is `public readonly`, and it is always a list of arrays, never
-  `null`, so a `foreach` over it needs no guard - while the keys *inside* each error are
-  SparkPost's payload and carry no promise
-* `Transmission::returnPath()` gains a docblock, and it is the only change here that reaches
-  an installed package. It says what the envelope FROM is, that SparkPost does not validate
-  it at post time although it does validate `from()`, and what happens to a value the
-  account is not configured for - it is discarded, the message goes out under the fallback
-  bounce domain, and only the domain ever survives because SparkPost supplies the local part
-* correction: the harness and `.env.example` described a bogus return path as producing mail
-  that never arrives. It does not. The value is discarded and the send proceeds, so a wrong
-  value and an empty one leave the envelope in the same place
+* `Transmission::returnPath()` documents the envelope FROM: SparkPost does not validate it at
+  post time, a value naming a domain the account is not configured for is discarded in favour
+  of the fallback bounce domain, and only the domain survives
+* README documents versioning and support - `^1.0` is the constraint to write, PHP 8.3 or
+  later, 1.x supported and 0.x not
+* README states what the stability promise covers. A break in a class, method or signature
+  means 2.0.0; `BounceClass` and `EventType` gain cases in a minor, so every `match` over them
+  needs a `default` arm; changing which classification an existing code maps to is a major
+* README states that `ApiException::$errors`, `$body`, `$statusCode` and `$retryAfter` are
+  covered by the major version, and that the keys inside each error and the shape of an event
+  are not
+* corrected the documented behaviour of a bogus return path in `.env.example` and the harness:
+  a bogus value and an empty one produce the same envelope
+* README and `Suppression::add()` describe the suppression propagation lag as an order of
+  magnitude rather than a fixed figure
+* README and the test fixtures use an illustrative subaccount id
 
 1.0.0 (2026-09-04)
 ------------------
 
-**The public API is declared stable.** From here a breaking change means 2.0.0, and Composer
-enforces it: `^1.0` is `>=1.0.0 <2.0.0`, so a consumer writes the constraint once instead of
-enumerating every 0.x minor as a separate compatible range.
+**The public API is declared stable.** A breaking change from here means `2.0.0`. The
+constraint to write is `^1.0`.
 
-* no functional change: `src/` is byte-identical to 0.4.0, and the version number is the whole
-  of this release
-
-**What the promise is being made on**, since a stability declaration is only worth the
-evidence behind it:
-
-* the PSR-18 seam has been driven by the kind of consumer it was designed for - an application
-  that cannot use an arbitrary HTTP client, and must route every outbound request through its
-  own stack for proxy support and SSRF protection. Its adapter took roughly ninety lines and
-  needed no change to any signature here, which is the question the seam existed to answer
-* every resource has been exercised against the live API, not only against the stub
-* 0.4.0 was cut because adopting the package in a real application surfaced a genuine defect
-  rather than a review comment: `BounceClassification::Informational` turned an
-  `UnhandledMatchError` in a production job into a handled case
+* no functional change: `src/` is byte-identical to 0.4.0
 
 0.4.0 (2026-09-04)
 ------------------
@@ -58,45 +37,27 @@ exhaustive `match` over that enum in a consumer throw `UnhandledMatchError`, and
 classes change the classification they report.
 
 * add `BounceClassification::Informational`, and reclassify `AutoReply` (60) and
-  `Subscribe` (80) onto it, from `Soft` and `Admin` respectively. Both describe a message
-  that was *delivered* and then drew a reply, so filing them with the failures meant the
-  obvious `match ($class->classification())` reached a punitive arm for a recipient who
-  had just opted in. The grouping is this package's, not SparkPost's - see the enum's own
-  docblock
-* `Unsubscribe` (90) deliberately stays `Hard` although it also describes a delivered
-  message: `isPermanent()` is what a consumer acts on, and "stop sending to this address"
-  is the right consequence for an opt-out. Pinned by a test
-* `BounceClass` cited a bounce-classification-codes URL that now redirects to bird.com and
-  no longer carries the table. The docblock says so, and points at the coarser rollup that
-  replaced it, with a warning that it is not the same table - it omits four of the codes
-* `RateLimitException` says that its empty body is not an empty type, and names the four
-  properties it inherits from `ApiException`
-* harness: print a group of figures with `Io::values()`, which aligns them to the group's
-  own widest label, and require `hampel/rig` at `^1.1` for it
+  `Subscribe` (80) onto it, from `Soft` and `Admin` respectively. Both describe a message that
+  was delivered and then drew a reply. The grouping is this package's, not SparkPost's
+* `Unsubscribe` (90) stays `Hard`
+* `BounceClass` cites a current source for the bounce classification table. The URL it carried
+  no longer serves one, and the table that replaced it omits four of the codes
+* `RateLimitException` documents its empty body and the four properties it inherits from
+  `ApiException`
+* harness: print grouped figures with `Io::values()`, and require `hampel/rig` at `^1.1`
 * CI: the declared-dependencies job runs `composer-require-checker` as well as the dev-free
-  analysis. The analysis cannot see a dependency that arrives transitively, nor a missing
-  `ext-*` - a function from an absent extension is indistinguishable from one from core -
-  which is how `ext-ctype` went undeclared from 0.1.0 to 0.3.0 with that job green
+  analysis
 
 0.3.0 (2026-08-27)
 ------------------
 
-* declare `ext-ctype`, which was used and not required - `ApiException` reads the
-  `Retry-After` header with `ctype_digit()`, and ctype is a separable extension that trimmed
-  builds do drop. Without the declaration a host that cannot run the code installs anyway and
-  fatals on an undefined function, on the path that handles an API error
-* nothing else here reaches an installed package - `src/` is untouched since 0.2.0, and the
-  remaining files are development-only or `export-ignore`d out of the dist archive
-* require `hampel/rig` at `^1.0` for the harness, up from `^0.1.2` - the guard that withholds
-  the environment file from the exercises arrived in rig 0.2.0, and a caret constraint below
-  the release that introduces something can never reach it
-* harness: a real delivery or a write to the suppression list needs a second opt-in, which is
-  deliberately not one that can be persisted in the environment file
-* harness: check that SparkPost still honours the message-events recipient filter, by asking
-  twice over one window and printing both counts - a filter the API stops recognising is
-  dropped silently and answers 200, which no stub can catch
-* harness: the suppression round trip now deletes its throwaway address in a `finally`, and
-  exits non-zero if that delete fails
+* declare `ext-ctype`, used by `ApiException` and not previously required
+* nothing else here reaches an installed package; `src/` is untouched since 0.2.0
+* require `hampel/rig` at `^1.0` for the harness, up from `^0.1.2`
+* harness: a real delivery or a write to the suppression list needs a second opt-in
+* harness: check that SparkPost still honours the message-events recipient filter
+* harness: the suppression round trip deletes its throwaway address in a `finally`, and exits
+  non-zero if that delete fails
 
 0.2.0 (2026-08-22)
 ------------------

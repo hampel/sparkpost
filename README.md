@@ -9,7 +9,7 @@
 By [Simon Hampel](mailto:simon@hampelgroup.com)
 
 A PHP client for the [SparkPost API](https://developers.sparkpost.com/api/), built on
-**PSR-18** so it works with whatever HTTP client your application already has.
+**PSR-18**.
 
 ## Installation
 
@@ -83,21 +83,18 @@ $transmission = Transmission::make()
     ->substitutionData(['first_name' => 'Alice']);
 ```
 
-Most of that is obvious. These parts are not, and are the reason the builder exists:
+Behaviour worth knowing:
 
-- **SparkPost sends one message per recipient**, so without a `header_to` every recipient
-  sees a `To:` line containing only themselves. The builder sets it on every recipient
-  from your `to()` list, which is what reproduces ordinary mail.
-- **Cc is made visible by a `CC` header**, not by the recipient list — the recipients are
-  how the mail is addressed, the header is how it is displayed. Bcc gets no header, which
-  is what makes it blind.
-- **A dozen headers are rejected** if you pass them in `content.headers`, because
-  SparkPost derives them from the transmission itself. `header()` drops those rather than
-  letting the API reject the whole send.
-- **`false` survives.** An option set to `false` is sent as `false`, not dropped as empty
-  — `openTracking(false)` means "do not track opens", not "use the account default".
-- **Mail from `@sparkpostbox.com`** switches the `sandbox` option on by itself, because
-  that domain silently fails without it. `sandbox(false)` overrides.
+- **SparkPost sends one message per recipient.** Without a `header_to`, every recipient sees
+  a `To:` line containing only themselves. The builder sets it on every recipient from your
+  `to()` list.
+- **Cc is made visible by a `CC` header**, not by the recipient list. Bcc gets no header.
+- **A dozen headers are rejected** if passed in `content.headers`. `header()` drops those
+  rather than letting the API reject the whole send.
+- **`false` survives.** An option set to `false` is sent as `false`, not dropped.
+  `openTracking(false)` means "do not track opens", not "use the account default".
+- **Mail from `@sparkpostbox.com`** switches the `sandbox` option on automatically.
+  `sandbox(false)` overrides.
 
 Stored templates and A/B tests replace the content entirely:
 
@@ -123,15 +120,13 @@ foreach ($sparkpost->messageEvents()->each($query) as $event) {
 }
 ```
 
-`each()` is lazy — a page is only fetched once the previous one has been consumed, so
-stopping early stops making requests. `from` and `to` are converted to UTC, which is what
-the API assumes when no timezone is given.
+`each()` is lazy: a page is fetched only once the previous one has been consumed, so stopping
+early stops making requests. `from` and `to` are converted to UTC.
 
 ### Picking the work up again later
 
-There are usually more events than one request has time to collect, so the position in a
-search is a **cursor that casts to a string**. Store it wherever a string can go, and
-resume in the next run:
+The position in a search is a **cursor that casts to a string**. Store it wherever a string
+can go and resume in a later run:
 
 ```php
 $page = $sparkpost->messageEvents()->search($query);
@@ -148,14 +143,12 @@ if ($page->hasMore()) {
 $page = $sparkpost->messageEvents()->next(EventCursor::fromString($job->data['cursor']));
 ```
 
-A page reports `$page->totalCount`, counts, and iterates. Events themselves are plain
-arrays: their shape varies a great deal by event type, and pinning it down would mean
-either a type that hides most of the payload or twenty of them.
+A page reports `$page->totalCount`, counts, and iterates. Events are plain arrays.
 
 ### Bounce classes
 
-SparkPost reports why a message bounced as a numeric class. The codes and their meanings
-are SparkPost's; what to *do* about each one is your policy:
+SparkPost reports why a message bounced as a numeric class. The codes and their meanings are
+SparkPost's; what to *do* about each one is your policy:
 
 ```php
 use Hampel\SparkPost\MessageEvent\BounceClass;
@@ -169,10 +162,8 @@ $class?->classification()->isPermanent();  // whether to stop sending to this ad
 $class?->slug();                           // 'invalid_recipient'
 ```
 
-**Not everything on the bounce channel is a bounce**, and this is the one thing worth
-reading before you write the `match`. Two classes describe a message that *arrived* and
-drew a reply: `auto_reply` (60), and `subscribe` (80), which is someone opting back in.
-Both are `Informational`:
+**Not everything on the bounce channel is a bounce.** Two classes describe a message that
+*arrived* and drew a reply: `auto_reply` (60) and `subscribe` (80). Both are `Informational`:
 
 ```php
 match ($class?->classification()) {
@@ -188,13 +179,10 @@ match ($class?->classification()) {
 };
 ```
 
-`Informational` is this package's grouping rather than SparkPost's own: their table files
-60 under soft and 80 under admin, which describes the SMTP exchange accurately and sends
-the obvious `match` arm off to punish a user who has just opted in.
+`Informational` is this package's grouping rather than SparkPost's own, which files 60 under
+`soft` and 80 under `admin`.
 
 ## Suppression
-
-Two questions, and the API answers both awkwardly enough to be worth wrapping.
 
 ```php
 $suppression = $sparkpost->suppression();
@@ -211,10 +199,8 @@ $entry?->created;       // DateTimeImmutable
 $entry?->transactional;
 ```
 
-**`find()` returns `null` for an address that is not suppressed**, which is worth stating
-because the API does not: SparkPost answers 404, so "this address is fine" arrives as an
-error. Only the 404 is translated — a 401 from a bad key is still thrown, rather than
-quietly reporting every address as clear.
+**`find()` returns `null` for an address that is not suppressed.** SparkPost answers 404 for
+one. Only the 404 is translated; a 401 from a bad key is still thrown.
 
 Removing an entry lets SparkPost attempt delivery again:
 
@@ -222,10 +208,8 @@ Removing an entry lets SparkPost attempt delivery again:
 $suppression->delete('someone@example.com');   // false if it was not on the list
 ```
 
-That is the operation worth having. SparkPost suppresses on a hard bounce by itself, and
-its list and your own idea of who may be emailed then drift apart — so an address you have
-re-enabled at your end can still be silently dropped at SparkPost's. Nothing in the sending
-path reports it, because it is not an error.
+SparkPost suppresses on a hard bounce by itself, so an address re-enabled in your application
+can still be dropped at SparkPost's end. Nothing in the sending path reports it.
 
 Reading the whole list, a page at a time:
 
@@ -240,10 +224,10 @@ $page->hasMore;
 ```
 
 **The list you see is the one your API key can see.** Suppression is scoped per subaccount,
-and a subaccount key is bound to its own automatically — so an address suppressed under a
-different subaccount simply is not there as far as that key is concerned. To work with a
-particular subaccount's list, use a key belonging to it. `sendingDomains()->forAddress()`
-above is how to find out which subaccount an address you send from belongs to.
+and a subaccount key is bound to its own. An address suppressed under a different subaccount
+is not visible to it. To work with a particular subaccount's list, use a key belonging to it;
+[`sendingDomains()->forAddress()`](#sending-domains-and-finding-the-subaccount) reports which
+subaccount an address belongs to.
 
 Adding one is a `PUT`, and therefore an upsert — an address already listed has its entry
 replaced rather than the call being rejected:
@@ -253,22 +237,18 @@ $suppression->add('someone@example.com', 'asked us to stop');
 $suppression->add('someone@example.com', transactional: false);
 ```
 
-**The list is eventually consistent**, which is worth knowing before you write anything
-around it. Measured against the live API, an added address took seconds rather than
-milliseconds to become readable, and a deleted one stayed readable about as long after the
-delete succeeded. The lag is not a constant — repeat measurements varied by a factor of two —
-so treat it as an order of magnitude and poll rather than sleeping a fixed interval. `add()`
-returning true means SparkPost accepted the write, not that `isSuppressed()` agrees yet.
-Nothing here retries for you.
+**The list is eventually consistent.** Measured against the live API, an added address took
+seconds rather than milliseconds to become readable, and a deleted one stayed readable for a
+similar stretch after the delete succeeded. The lag is not a constant — repeat measurements
+varied by a factor of two. `add()` returning true means SparkPost accepted the write, not that
+`isSuppressed()` agrees yet. Nothing here retries; poll if you need to see the change.
 
-Whether an unsubscribe in your application should also go on SparkPost's list is a policy
-question, and it is yours rather than this package's.
+Whether an unsubscribe in your application also goes on SparkPost's list is your policy, not
+this package's.
 
 ## Sending domains, and finding the subaccount
 
-Read-only. Creating and verifying a sending domain is an administration task done once in
-SparkPost's own UI, and a key that can write here can change where an account's mail appears
-to come from — so this only reads, and the key only needs the read grant.
+Read-only; the key needs only the read grant.
 
 ```php
 foreach ($sparkpost->sendingDomains()->all() as $domain) {
@@ -279,10 +259,9 @@ foreach ($sparkpost->sendingDomains()->all() as $domain) {
 }
 ```
 
-The reason it is here is `subaccountId`. **Suppression is per-subaccount**, and a subaccount
-API key cannot read the subaccounts endpoint at all — SparkPost offers no such permission
-for one. The sending domain carries the number, so the address you send as is the way to
-find out which subaccount you are operating in:
+**Suppression is per-subaccount**, and a subaccount API key cannot read the subaccounts
+endpoint. The sending domain carries the number, so an address you send from is the route to
+the subaccount it belongs to:
 
 ```php
 $domain = $sparkpost->sendingDomains()->forAddress('Support <noreply@mail.example.com>');
@@ -292,15 +271,13 @@ $domain?->hasSubaccount();   // false for the primary account, which is 0 or abs
 ```
 
 `forAddress()` reads the display-name form as well as a bare address, and returns `null`
-without making a request when it is handed something that is not an address at all.
-`find($domain)` returns `null` for a domain the account does not have — which is also the
-reason a send from it would be refused.
+without making a request for something that is not an address. `find($domain)` returns `null`
+for a domain the account does not have.
 
 ## HTTP 200 does not mean the mail was sent
 
-SparkPost returns `200` having accepted zero recipients, so the status code alone will tell
-you a send succeeded when nothing left the building. That is what `TransmissionResult` is
-for:
+SparkPost returns `200` having accepted zero recipients. `TransmissionResult` reports what was
+actually taken:
 
 ```php
 if (! $result->wasAccepted()) {
@@ -313,15 +290,11 @@ $result->totalRejectedRecipients;
 $result->hasRejections();
 ```
 
-Rejected recipients are reported rather than thrown, because what counts as a failure is
-your policy: a mail transport should treat `wasAccepted() === false` as a failed send, a
-bulk job may not.
+Rejected recipients are reported rather than thrown; what counts as a failure is your policy.
 
 ## Errors
 
-Everything this package throws implements `Hampel\SparkPost\Exception\ExceptionInterface`,
-so one clause catches the lot. Below that, the distinctions are the ones you would actually
-branch on:
+Everything this package throws implements `Hampel\SparkPost\Exception\ExceptionInterface`.
 
 | Exception | When | Retry? |
 |---|---|---|
@@ -349,18 +322,15 @@ try {
 
 ## Bringing your own HTTP client
 
-Any PSR-18 client works, which matters when the host application has its own HTTP stack
-that you are not free to bypass — one routing every outbound request through a configurable
-proxy, with SSRF protections applied on the way out. An adapter implementing `sendRequest()`
-over that keeps all of it and still shares this package, rather than forcing a second API
-client to be written alongside.
+Any PSR-18 client works. An application with its own HTTP stack — one routing every outbound
+request through a configurable proxy, with SSRF protections applied on the way out — supplies
+an adapter implementing `sendRequest()` over it.
 
-The same seam is what makes the test suite network-free — see `tests/StubClient.php`.
+The test suite uses the same seam and makes no network calls.
 
 ## Endpoints not yet wrapped
 
-`$sparkpost->connection()` exposes `get()` and `post()` directly, so an endpoint this
-package has not covered yet is a call away rather than a release away:
+`$sparkpost->connection()` exposes `get()` and `post()` directly:
 
 ```php
 $body = $sparkpost->connection()->get('webhooks');
@@ -372,66 +342,51 @@ handled either way.
 
 ## Versioning and support
 
-Semantic versioning. `1.0.0` declares the public API stable, so the constraint to write is:
+Semantic versioning. `1.0.0` declares the public API stable.
 
 ```json
 "hampel/sparkpost": "^1.0"
 ```
 
-That is `>=1.0.0 <2.0.0`. **Write `^1.0`, not `~1.0.0`** — the tilde means `>=1.0.0 <1.1.0`,
-which pins you to patch releases and quietly withholds every additive one. The two look
-interchangeable and are not.
+That is `>=1.0.0 <2.0.0`. **Write `^1.0`, not `~1.0.0`**: the tilde means `>=1.0.0 <1.1.0`,
+which resolves only patch releases.
 
 * **PHP 8.3 or later.** Tested against 8.3 (including at the lowest resolvable dependency
   set) and 8.5.
 * **1.x is supported.** Fixes land on the current minor.
-* **0.x is not, and there is nothing to weigh up.** `src/` is byte-identical between 0.4.0
-  and 1.0.0, so upgrading from 0.4.0 is a constraint edit with no code change behind it.
-  Before that, every 0.x minor was a breaking boundary to Composer, which is the tax `^1.0`
-  removes.
+* **0.x is not.** `src/` is byte-identical between 0.4.0 and 1.0.0, so upgrading from 0.4.0
+  is a constraint edit with no code change.
 
 ### What "stable" covers, and the one place it deliberately does not
 
 A breaking change to a class, method or method signature in `src/` means `2.0.0`.
 
-**`BounceClass` and `EventType` are the exception, and it is a deliberate one.** They mirror
-SparkPost's own taxonomy, which this package does not control — if SparkPost issues a new
-bounce code, a new case appears here **in a minor release**. So:
+**`BounceClass` and `EventType` are the exception.** They mirror SparkPost's own taxonomy,
+which this package does not control, so a new bounce code appears here **in a minor release**.
 
-**every `match` over one of these enums needs a `default` arm.** That is not defensive
-padding, it is the supported way to use them — see the example under
-[Bounce classes](#bounce-classes), which has one for exactly this reason. Without it, a new
-SparkPost code is a fatal `UnhandledMatchError`.
+**Every `match` over one of these enums needs a `default` arm.** Without one, a new SparkPost
+code is a fatal `UnhandledMatchError`. The example under
+[Bounce classes](#bounce-classes) has one.
 
-The failure mode is worth picturing: a vacation auto-reply arrives in a background job, the
-`match` has no arm for the new case, and the stack trace points at your own code without
-mentioning an upgrade.
-
-What *does* mean a major: **changing which classification an existing code maps to.** That is
-a silent behaviour change rather than a loud one, so it gets the loud version number. 0.4.0
-moved `AutoReply` (60) and `Subscribe` (80), and was released as a breaking change for that
-reason as much as for the new case.
+**Changing which classification an existing code maps to is a major.** 0.4.0 moved
+`AutoReply` (60) and `Subscribe` (80).
 
 ### Decoded SparkPost data: the container is stable, the contents are not
 
-The same split, in the other place SparkPost's own data crosses into this package's public
-API — `ApiException::$errors`, `ApiException::$body`, and the event arrays from
+Applies to `ApiException::$errors`, `ApiException::$body`, and the event arrays from
 `messageEvents()`.
 
-**Stable, and covered by the major version:**
+**Covered by the major version:**
 
 * `$errors` exists on every `ApiException` subclass, is `public readonly`, and is always a
-  list of arrays — `[]` when the response carried no `errors` key or was not JSON at all
-  (a proxy answering with HTML is an expected input here, not an edge case). It is never
-  `null`, so `foreach` over it needs no guard.
+  list of arrays — `[]` when the response carried no `errors` key or was not JSON at all. It
+  is never `null`.
 * likewise `$statusCode` (`int`), `$body` (`string`, the raw response) and `$retryAfter`
   (`?int`).
 
-**Promised by nobody — not by this package, and not to it:** the keys *inside* each error,
-and the shape of an event. Those are SparkPost's payload, passed through with no reshaping
-beyond dropping non-array entries. If SparkPost renames a field inside `errors[]`, this
-package will not notice and will not issue a major for it, and no version number anywhere
-will have moved. Read them with `??`, as below.
+**Not covered:** the keys *inside* each error, and the shape of an event. Those are
+SparkPost's payload, passed through with no reshaping beyond dropping non-array entries. A
+field renamed inside `errors[]` will not produce a major here. Read them with `??`:
 
 ```php
 // safe: guard on the type, read the property, treat what is inside as untrusted
@@ -442,10 +397,9 @@ if ($previous instanceof ApiException) {
 }
 ```
 
-The rule of thumb across all three carve-outs is the same one: **this package promises the
-shape it built and does not promise the shape SparkPost sent.** Where those meet — an enum
-of SparkPost's codes, an array of SparkPost's errors — the container is ours and the contents
-are theirs.
+**This package promises the shape it built, not the shape SparkPost sent.** Where the two
+meet — an enum of SparkPost's codes, an array of SparkPost's errors — the container is covered
+by the major version and the contents are not.
 
 ## Licence
 
