@@ -6,6 +6,7 @@ namespace Hampel\SparkPost\Tests;
 
 use Hampel\SparkPost\Config;
 use Hampel\SparkPost\Connection;
+use Hampel\SparkPost\SparkPost;
 
 final class SparkPostTest extends TestCase
 {
@@ -47,5 +48,38 @@ final class SparkPostTest extends TestCase
         $this->assertSame($sparkpost->connection(), $sparkpost->connection());
         $this->assertSame($sparkpost->transmissions(), $sparkpost->transmissions());
         $this->assertSame($sparkpost->messageEvents(), $sparkpost->messageEvents());
+    }
+
+    public function test_the_short_form_sends_the_key_to_the_default_host(): void
+    {
+        $sparkpost = SparkPost::withKey('a-key', $this->client);
+
+        $this->client->pushJson(200, ['results' => []]);
+        $sparkpost->connection()->get('sending-domains');
+
+        $request = $this->client->lastRequest();
+        $this->assertSame(Config::DEFAULT_HOST, $request->getUri()->getHost());
+        $this->assertSame('a-key', $request->getHeaderLine('Authorization'));
+    }
+
+    public function test_the_short_form_takes_a_region(): void
+    {
+        $sparkpost = SparkPost::withKey('a-key', $this->client, 'eu');
+
+        $this->client->pushJson(200, ['results' => []]);
+        $sparkpost->connection()->get('sending-domains');
+
+        $this->assertSame('api.eu.sparkpost.com', $this->client->lastRequest()->getUri()->getHost());
+    }
+
+    public function test_the_short_form_passes_the_logger_through(): void
+    {
+        $logger = new RecordingLogger();
+        $sparkpost = SparkPost::withKey('a-key', $this->client, logger: $logger);
+
+        $this->client->pushJson(200, ['results' => []]);
+        $sparkpost->connection()->get('sending-domains');
+
+        $this->assertNotSame([], $logger->records);
     }
 }

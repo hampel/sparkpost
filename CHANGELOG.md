@@ -4,6 +4,10 @@ CHANGELOG
 Unreleased
 ----------
 
+* PSR-17 factories are optional in the `SparkPost` constructor. When either is omitted,
+  Guzzle's, Nyholm's or Diactoros' is found by class name; `InvalidArgumentException` if none is
+  installed
+* add `SparkPost::withKey()`, taking the API key, a PSR-18 client and an optional region
 * `Transmission::returnPath()` documents the envelope FROM: SparkPost does not validate it at
   post time, a value naming a domain the account is not configured for is discarded in favour
   of the fallback bounce domain, and only the domain survives

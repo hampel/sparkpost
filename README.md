@@ -17,25 +17,23 @@ A PHP client for the [SparkPost API](https://developers.sparkpost.com/api/), bui
 composer require hampel/sparkpost
 ```
 
-You also need a PSR-18 client and a PSR-17 factory. Guzzle provides both, 7 or 8:
+You also need a PSR-18 client. Guzzle provides one, 7 or 8:
 
 ```bash
 composer require guzzlehttp/guzzle
 ```
 
+PSR-17 factories are found automatically when not passed — Guzzle's, Nyholm's or Diactoros',
+whichever is installed. The PSR-18 client is always passed.
+
 ## Usage
 
 ```php
 use GuzzleHttp\Client;
-use GuzzleHttp\Psr7\HttpFactory;
-use Hampel\SparkPost\Config;
 use Hampel\SparkPost\SparkPost;
 use Hampel\SparkPost\Transmission\Transmission;
 
-$guzzle  = new Client();
-$factory = new HttpFactory();   // PSR-17, fills both the request and stream roles
-
-$sparkpost = new SparkPost(new Config('MY-API-KEY'), $guzzle, $factory, $factory);
+$sparkpost = SparkPost::withKey('MY-API-KEY', new Client());
 
 $result = $sparkpost->transmissions()->send(
     Transmission::make()
@@ -49,7 +47,17 @@ $result = $sparkpost->transmissions()->send(
 For the EU tenancy, or any other region:
 
 ```php
-$sparkpost = new SparkPost(Config::forRegion('MY-API-KEY', 'eu'), $guzzle, $factory, $factory);
+$sparkpost = SparkPost::withKey('MY-API-KEY', new Client(), 'eu');
+```
+
+The constructor takes a `Config` and the factories explicitly:
+
+```php
+use GuzzleHttp\Psr7\HttpFactory;
+use Hampel\SparkPost\Config;
+
+$factory   = new HttpFactory();   // PSR-17, fills both the request and stream roles
+$sparkpost = new SparkPost(new Config('MY-API-KEY'), new Client(), $factory, $factory);
 ```
 
 A PSR-3 logger is optional and takes a fifth argument. Requests are logged at `debug`,
@@ -302,7 +310,7 @@ Everything this package throws implements `Hampel\SparkPost\Exception\ExceptionI
 | `ClientException` | A 4xx. The request or the key was wrong | Not unchanged |
 | `RateLimitException` | A 429, with `$retryAfter` when the header was sent | Yes, after waiting |
 | `ServerException` | A 5xx. SparkPost's problem, probably temporary | Yes |
-| `InvalidArgumentException` | Caught before the network — empty key, unencodable payload | No |
+| `InvalidArgumentException` | Caught before the network — empty key, unencodable payload, no PSR-17 factory found | No |
 
 `ClientException`, `RateLimitException` and `ServerException` all carry `$statusCode`,
 the decoded `$errors` array, the raw `$body`, and `$retryAfter`.

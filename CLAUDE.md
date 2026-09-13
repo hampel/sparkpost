@@ -27,8 +27,10 @@ vendor/bin/rig                                  # the live-API exercises, below
 
 ## The PSR-18 seam is the whole design
 
-The client is injected as `Psr\Http\Client\ClientInterface` with PSR-17 factories, never as a
-concrete class, and `Connection` is the only file that touches HTTP.
+The client is injected as `Psr\Http\Client\ClientInterface`, never as a concrete class, and
+`Connection` is the only file that touches HTTP. The PSR-17 factories are optional:
+`Support/Psr17Discovery` finds Guzzle's, Nyholm's or Diactoros' when either is omitted, and
+`SparkPost::withKey()` is the short form built on that.
 
 This is not abstraction for its own sake. Some host applications cannot use an arbitrary HTTP
 client at all: they require every outbound request to go through their own stack, for proxy support
@@ -46,8 +48,20 @@ Two consequences to keep in mind when changing `Connection`:
 
 **Do not add `php-http/discovery`** as a dependency. It is a Composer plugin, and a consumer may
 refuse to run it — `"allow-plugins": {"php-http/discovery": false}` is a realistic line to find in
-an application's `composer.json`. A convenience constructor may use it if it happens to be
-installed, but the explicit constructor has to remain the supported path.
+an application's `composer.json`. `Psr17Discovery` is what replaces it, and it works by class
+**name**, checked with `instanceof`: no symbol from any PSR-7 implementation is written, so
+`composer-require-checker` has nothing undeclared to find, and a class that exists but is not a
+factory is skipped rather than returned. Keep it that way when adding a candidate.
+
+**The PSR-18 client is never discovered, and that asymmetry is deliberate.** Which client makes
+the request is the one decision a host application may not be allowed to delegate — the same
+applications this seam exists for. A factory builds a value object; a client decides where the
+request goes.
+
+A discovery failure throws `InvalidArgumentException`, not a new type: nothing was passed and
+nothing could be found, which is a caller error before the network, and the exception hierarchy
+below stays as documented. `tests/Psr17DiscoveryTest.php` reaches the not-found path through
+`Psr17Discovery::from()`, because `find()` cannot miss on a machine with Guzzle installed.
 
 ## Dependency constraints are load-bearing
 
@@ -71,6 +85,11 @@ of that range honest.
 ## Architecture
 
 - `SparkPost` — entry point and resource factory. Builds one `Connection` and memoises resources.
+  `withKey($key, $client, $region)` is the short form; the region precedes the optional
+  factories because an EU caller cannot do without it.
+- `Support/Psr17Discovery` — finds PSR-17 factories by class name when none are passed. The
+  same class, namespace aside, is in the other PSR-18 API clients under `hampel/*`; keep a
+  candidate added here in step with them.
 - `Config` — API key, base URI, region. `resolve()` turns a path into a URI and is where SparkPost's
   pagination links get handled: they come back already carrying the `/api/v1/` prefix that `baseUri`
   ends with, so the prefix is stripped here rather than at each call site.
