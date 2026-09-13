@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 (2026-09-13)
 
 - PSR-17 factories are optional in the `SparkPost` constructor. When either is omitted,
   Guzzle's, Nyholm's or Diactoros' is found by class name; `InvalidArgumentException` if none is
