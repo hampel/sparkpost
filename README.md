@@ -359,10 +359,10 @@ Semantic versioning. `1.0.0` declares the public API stable.
 That is `>=1.0.0 <2.0.0`. **Write `^1.0`, not `~1.0.0`**: the tilde means `>=1.0.0 <1.1.0`,
 which resolves only patch releases.
 
-* **PHP 8.3 or later.** Tested against 8.3 (including at the lowest resolvable dependency
+- **PHP 8.3 or later.** Tested against 8.3 (including at the lowest resolvable dependency
   set) and 8.5.
-* **1.x is supported.** Fixes land on the current minor.
-* **0.x is not.** `src/` is byte-identical between 0.4.0 and 1.0.0, so upgrading from 0.4.0
+- **1.x is supported.** Fixes land on the current minor.
+- **0.x is not.** `src/` is byte-identical between 0.4.0 and 1.0.0, so upgrading from 0.4.0
   is a constraint edit with no code change.
 
 ### What "stable" covers, and the one place it deliberately does not
@@ -386,10 +386,10 @@ Applies to `ApiException::$errors`, `ApiException::$body`, and the event arrays 
 
 **Covered by the major version:**
 
-* `$errors` exists on every `ApiException` subclass, is `public readonly`, and is always a
+- `$errors` exists on every `ApiException` subclass, is `public readonly`, and is always a
   list of arrays — `[]` when the response carried no `errors` key or was not JSON at all. It
   is never `null`.
-* likewise `$statusCode` (`int`), `$body` (`string`, the raw response) and `$retryAfter`
+- likewise `$statusCode` (`int`), `$body` (`string`, the raw response) and `$retryAfter`
   (`?int`).
 
 **Not covered:** the keys *inside* each error, and the shape of an event. Those are

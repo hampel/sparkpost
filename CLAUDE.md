@@ -1,8 +1,11 @@
-# CLAUDE.md
+# Working on the SparkPost API client
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Standing instructions for anyone changing this package, Claude Code included: how it is built
+and tested, the decisions that look arbitrary and are not, and what has to stay true across a
+release. `README.md` is the documentation for someone using the package; this file is for someone
+changing it.
 
-## What this package is
+## An API client usable from any host, with the mail transport kept out of it
 
 `hampel/sparkpost` — a PHP client for the SparkPost API, written to be usable from any host
 application rather than tied to one HTTP library or framework.
@@ -12,13 +15,13 @@ depends on this one. **Nothing in here may depend on `symfony/mailer`** — that
 reason the packages are split, and it is what keeps this package usable from an application with no
 Symfony in it at all.
 
-## Commands
+## `composer check` runs what CI runs
 
 ```bash
 composer install
 composer check                                  # lint, analyse, test - what CI runs
 composer test                                   # phpunit
-composer analyse                                # phpstan, level 10 - see Version support
+composer analyse                                # phpstan, level 10 - see the PHP section below
 composer format                                 # pint, PSR-12
 vendor/bin/phpunit --filter test_name           # one test
 vendor/bin/phpunit tests/ConfigTest.php         # one file
@@ -82,7 +85,7 @@ one class satisfies every version the package supports. Adding the types "for ti
 fine here and breaks the `--prefer-lowest` corner in CI, which is what holds the `psr/log 1.1` end
 of that range honest.
 
-## Architecture
+## `Connection` is the only class that touches HTTP
 
 - `SparkPost` — entry point and resource factory. Builds one `Connection` and memoises resources.
   `withKey($key, $client, $region)` is the short form; the region precedes the optional
@@ -95,15 +98,14 @@ of that range honest.
   ends with, so the prefix is stripped here rather than at each call site.
 - `Connection` — request building, sending, decoding, and the single place a failed response becomes
   an exception. `SparkPost::connection()` exposes its `get()` and `post()` deliberately, so an
-  endpoint with no `Resource` yet is a call away rather than a release away. `composer.json`
-  advertises suppression and nothing wraps it — that is the gap this hatch covers meanwhile.
+  endpoint with no `Resource` yet is a call away rather than a release away.
 - `Resource/*` — one class per API area, taking and returning plain data.
 - `Result/*` — typed results where the shape is worth pinning down.
 - `Exception/*` — see below.
 
-### Exceptions
+### The exception tree follows how far the request got
 
-```
+```text
 ExceptionInterface                     catch-all for this package
 ├── InvalidArgumentException           caller error, before the network
 └── SparkPostException (abstract)
@@ -121,7 +123,7 @@ distinguishes client from server errors still catches it.
 that can answer on that URL — a proxy or gateway will return HTML — so `json_decode()` returning
 `null`, and a JSON body with no `errors` key, are both expected inputs, not edge cases.
 
-## The Transmission builder
+## The Transmission builder exists for five rules that are easy to get wrong
 
 `Transmission` builds the payload. Most of its value is not the obvious fields but five
 rules that are easy to get wrong and produce mail that looks fine until someone reads the
@@ -155,7 +157,7 @@ success and ignored the body, so a rejected send looked identical to a delivered
 whether that counts as failure is the caller's policy. `hampel/sparkpost-transport` is where
 `wasAccepted() === false` becomes a thrown `TransportException`.
 
-## Message events, and why the cursor is a string
+## A message-events cursor is a string, so a queue job can keep its place
 
 Paging is the substance of this resource, not a detail of it, because the two callers are
 genuinely different. A script that runs to completion wants `each()`, which walks every page
@@ -183,8 +185,8 @@ Two bounce classes describe a message that was *delivered* and then drew a reply
 and `Subscribe` (80) — and SparkPost files them under `soft` and `admin` respectively, alongside
 real failures. That is faithful to the SMTP exchange and actively misleading downstream: the
 obvious `match ($class->classification())` then reaches a punitive arm for someone who has just
-opted in. The XenForo add-on hit exactly that, and had to carry its own carve-out plus a test
-named after the trap.
+opted in. A consumer matching exhaustively hit exactly that before 0.4.0, and had to carry its own
+carve-out plus a test named after the trap.
 
 The line that keeps the position above intact: *"did this message reach the recipient?"* is a fact
 about the taxonomy, and only this package is positioned to answer it for all 21 codes. *"Should I
@@ -204,7 +206,7 @@ message pending a challenge nobody answered, so it reached no one. Bird's curren
 format carries no offset, so otherwise the same query means different things depending on where
 the server runs.
 
-## Suppression, and the two shapes that differ from message events
+## Suppression answers in two shapes that differ from message events
 
 The resource exists for two questions — *is this address suppressed, and why*, and *take it
 off the list* — and both are shaped by how the API answers rather than by what it offers.
@@ -217,7 +219,7 @@ wrong, so the status check is the point of that block, not defensiveness around 
 **`links` is not the shape the events endpoint uses**, and nothing about the response makes
 that visible:
 
-```
+```text
 events:      "links": {"next": "/api/v1/events/message?..."}
 suppression: "links": [{"href": "...", "rel": "next"}, {"href": "...", "rel": "last"}]
 ```
@@ -244,14 +246,14 @@ application — the same reasoning that keeps bounce policy out of `BounceClass`
 exposed: it addresses SparkPost's own mailing lists, which nothing using this package has.
 
 **The list is eventually consistent, and it is not subtle.** Measured against the live API: an
-added address took ~6–7s to become readable on 22 August 2026 and ~10.3s on the 27th, and a
+added address took ~6–7s to become readable on 2026-08-22 and ~10.3s on 2026-08-27, and a
 deleted one stays readable for about as long after the delete returns success. Treat the figure
 as an order of magnitude rather than a constant — the harness polls for 30s because the second
 measurement left under five seconds of headroom under the 15s ceiling it had, and a loop that
-gives up prints a warning that reads as a finding about SparkPost rather than about the loop. Nothing in the resource retries or
-sleeps — hiding it would make every genuine miss slow, and a caller that needs to observe the
-change has to poll. `harness/suppression.php` does exactly that, and its round trip is the only
-thing that exercises `add()` and `delete()` for real.
+gives up prints a warning that reads as a finding about SparkPost rather than about the loop.
+Nothing in the resource retries or sleeps — hiding it would make every genuine miss slow, and a
+caller that needs to observe the change has to poll. `harness/suppression.php` does exactly that,
+and its round trip is the only thing that exercises `add()` and `delete()` for real.
 
 **Do not add `X-MSYS-SUBACCOUNT` support**, and this is the note that exists so it does not
 get added by someone reading SparkPost's documentation and finding it missing.
@@ -290,7 +292,7 @@ subaccount API key cannot read the subaccounts endpoint at all** — that is not
 grant, SparkPost has no such permission for a subaccount key, confirmed on a real one. The
 sending domain is therefore the only route from an address to the subaccount it belongs to.
 
-Confirmed against live data on 27 August 2026, from three directions that agree: `forAddress()`
+Confirmed against live data on 2026-08-27, from three directions that agree: `forAddress()`
 on a real From returned the same subaccount a suppression entry carries, and the envelope
 addresses in the events output embed that same number, on the domain this resource reports as
 the default bounce domain. Note also that all nine domains a subaccount key can see belong to
@@ -311,14 +313,14 @@ would be an assertion dressed as a type.
 everything after the last `@` keeps the closing bracket and then asks SparkPost for a domain
 with a `>` in it — a test asserted that behaviour as correct before it was noticed.
 
-## Tests
+## The suite needs no network, and a test that does means the design is wrong
 
 `tests/StubClient.php` is a PSR-18 client that answers from a queue and records requests, so the
 suite needs no network and no Guzzle mock handler. Guzzle is a dev dependency only, for its PSR-7
 objects, and is constrained to `^7.8|^8.0` so CI resolves it at both majors — Guzzle 8 brings
 `guzzlehttp/psr7 ^3.0`, and it is the client most consumers will plug into the PSR-18 seam, so a
-PSR-7 major that broke request building here should fail in CI rather than in their application. Any new resource gets tested through the stub — if a test needs the network, the design is
-wrong.
+PSR-7 major that broke request building here should fail in CI rather than in their application.
+Any new resource gets tested through the stub — if a test needs the network, the design is wrong.
 
 The rest of the suite's scaffolding, none of it incidental:
 
@@ -332,7 +334,7 @@ The rest of the suite's scaffolding, none of it incidental:
 
 Namespace is `Hampel\SparkPost\Tests\`, filename suffix `Test.php`.
 
-## Exercising against the real API
+## The harness answers what a stub cannot, and delivers nothing by default
 
 `harness/` holds five `hampel/rig` exercises. They are not tests and assert nothing — they exist
 for the questions a stub structurally cannot answer.
@@ -365,7 +367,7 @@ counts. Two numbers that match is the failure. It still asserts nothing — a pe
 numbers settles this, and a test cannot, because asserting on the comparison would mean already
 knowing the answer being looked for.
 
-Run against the live API on 27 August 2026: 36 events in the window, 0 with an impossible
+Run against the live API on 2026-08-27: 36 events in the window, 0 with an impossible
 recipient, so the filter is being applied.
 
 **Print a group that is meant to be compared with `Io::values()`, not a run of `value()`
@@ -375,7 +377,7 @@ the only thing this probe asks anyone to do. `values()` takes the whole group an
 its own widest label, so the labels can say what they mean. That is why `hampel/rig` is
 constrained to **`^1.1`**: `values()` arrived there, and `^1.0` resolves to a rig without it.
 
-Two exceptions worth knowing. A single value is just a group of one, so `value()` stays fine
+Two exceptions worth knowing. A single value is a group of one, so `value()` stays fine
 for anything not being compared. And **do not use `values()` where an earlier item can throw
 before a later one is computed** — it builds the whole array before printing, so a throw loses
 the results already gathered. The two deletes in `suppression`'s round trip are two `value()`
@@ -386,38 +388,26 @@ and DMARC are decided somewhere no test can reach. The envelope address takes th
 what SPF authenticates; the header From is what DMARC aligns against.
 
 **SparkPost validates the two sender fields in different places, and conflating them put a wrong
-claim in these files.** Read off the API on 22 August 2026: a `from` address on a domain that is not
+claim in these files.** Read off the API on 2026-08-22: a `from` address on a domain that is not
 a configured sending domain is rejected outright — `HTTP 400 Unconfigured Sending Domain <domain>` —
 while a `return_path` is not validated at post time at all, and a completely bogus one is accepted
 with a 200. So acceptance says the payload was well formed and nothing else. Do not restore a claim
 that an unverified bounce domain is refused; that rule belongs to the From address.
 
-**What SparkPost then does with the value is a different class of claim, and it was measured later.**
-A `return_path` naming a domain the account is not configured for is *discarded*, and the message
-goes out under the fallback — the account's default bounce domain, or the subaccount's where the key
-is a subaccount key, and `sparkpostmail.com` where neither is configured. Only the domain ever
+**What SparkPost then does with the value is a different class of claim, measured later.** A
+`return_path` naming a domain the account is not configured for is *discarded*, and the message
+goes out under the fallback — the account's default bounce domain, or the subaccount's where the
+key is a subaccount key, and `sparkpostmail.com` where neither is configured. Only the domain ever
 survives in any case: SparkPost replaces the local part with an identifier of its own, so
-`foo@bounce.example.com` is delivered as `<id>@bounce.example.com`. A local part you did not choose
-is what success looks like. Measured across every combination on a real account by Simon in
-September 2026 and reported here by the `sparkpost-transport` and `comparefunds` sessions — none of
-it is reachable from this package's source, a test or a harness payload, which is why it is recorded
-as reported rather than stated flatly.
+`foo@bounce.example.com` is delivered as `<id>@bounce.example.com`. A local part you did not
+choose is what success looks like. Measured across every combination on a real account and
+reported on 2026-09-04 — none of it is reachable from this package's source, a test or a harness
+payload, so it is recorded as reported rather than stated flatly.
 
 **A bogus value and an empty one are therefore the same state**, which is the half that is easy to
 get backwards. What a wrong value costs is not delivery and not alignment — unset is unaligned too.
-It is the appearance of having configured something, and nobody re-examines a setting that looks set.
-
-**This section used to carry `Verified 22 August 2026` over two claims of different kinds, and only
-one of them had been verified.** The 400 and the 200 were read off the API. *"The message then never
-arrives, blocked downstream where DMARC is the likely cause"* was an inference from one uncontrolled
-send with no bounce captured; Simon's own words hedged it — *"or if it did, I haven't yet received
-it"* — and every summary written from them dropped the hedge. It is probably right, since he changed
-the address back to a legitimate domain in the same sitting and the message arrived. But if it is
-right then, bogus and unset being the same state, an empty field would have failed that send
-identically, and what it shows is that DKIM alignment was not carrying that domain on its own that
-afternoon. That is a fact about an account, not about this package. **The remedy for a stamp like
-that is not a fresh date** — it is saying which half was observed and which inferred, so the join
-stays visible.
+It is the appearance of having configured something, and nobody re-examines a setting that looks
+set.
 
 `send` prints `return_path` from the built payload rather than
 from the variable — it is a top-level field, and putting it under `options` instead is a mistake the
@@ -432,7 +422,7 @@ missing-credentials guard, not knowing a populated `.env` was already here, and 
 opt-in sink flag would not have helped, because a session unaware of the `.env` is equally unaware
 of the flag. Do not flip it to opt-in.
 
-### Three layers, and the two switches that are not interchangeable
+### Three layers stop an accidental send, and their two switches are not interchangeable
 
 The sink default above is the middle one of three, and on its own it protects nobody who matters.
 It is a default, and the `.env` that actually exists on the machine of whoever owns the key
@@ -449,7 +439,7 @@ overrides it — because that person genuinely does want to deliver. So the laye
    `suppression`.
 3. **the opt-in is itself refused under an agent**, which is what closes the gap in (2).
 
-```
+```text
 SPARKPOST_DELIVER=1                      the human's ordinary opt-in; lives in .env
 SPARKPOST_SUPPRESSION_ROUNDTRIP=1        likewise
 SPARKPOST_SUPPRESSION_DELETE=<address>   likewise
@@ -479,13 +469,13 @@ environment.
 `.env` and `.env.*` are gitignored with `!.env.example`; `harness/` is `export-ignore`d, along with
 `tests/`, `CLAUDE.md` and the tooling config, so none of it ships in the Packagist archive.
 
-## Version support
+## PHP 8.3 and later, analysed across the whole range in one pass
 
-`php: >=8.3` per the Tier A support policy — published packages get the widest support and the most
-verification, because strangers are hurt silently when they break — with PHPStan analysing the
-whole 8.3–8.5 range in one pass (`phpVersion` in `phpstan.neon`). Keep that range in step with the
-`php` constraint in `composer.json`. Widening or narrowing either is a policy decision, not a
-judgement call.
+`php: >=8.3`, every PHP version with upstream security support — a published package gets the
+widest support and the most verification, because strangers are hurt silently when it breaks —
+with PHPStan analysing the whole 8.3–8.5 range in one pass (`phpVersion` in `phpstan.neon`). Keep
+that range in step with the `php` constraint in `composer.json`. Widening or narrowing either is a
+policy decision, not a judgement call.
 
 PHPStan runs at **level 10** over both `src` and `tests`, with nothing excluded.
 
@@ -495,7 +485,7 @@ current, and 8.5. PHPStan runs in each of those jobs and not only in one of its 
 tree resolved against — PHPStan's own version included, which is what the `--prefer-lowest` corner
 is for.
 
-## Releases
+## Since 1.0.0 a break means 2.0.0, with one carve-out for SparkPost's taxonomies
 
 Since 1.0.0 the public API is stable, and that is a promise with a stated shape rather than a
 mood. A breaking change to a class, method or signature in `src/` means **2.0.0**.
@@ -512,8 +502,9 @@ changes what an application does to a real recipient. 0.4.0 did both — it adde
 earned the breaking version.
 
 `CHANGELOG.md` is hand-maintained, newest first, and updated in its own commit before tagging.
-Headings are setext-underlined rather than `##` — `x.y.z (YYYY-MM-DD)` over a row of dashes, matching
-the released sections already there — with bullet points below. Notes accumulate under an
-`Unreleased` heading as they land, which the release commit renames to `x.y.z (YYYY-MM-DD)`; so
-there is one only while something is waiting, and cutting a release consumes it. Simon does his own pushes and
-tagging.
+**Each release is an `h2`, `## x.y.z (YYYY-MM-DD)`, with `-` bullets below** — hash headings
+rather than setext underlines, which stop at two levels and put the level on the line after the
+text where no line-oriented tool can see it. Notes accumulate under `## Unreleased` as they land,
+which the release commit renames to `## x.y.z (YYYY-MM-DD)`; so there is one only while something
+is waiting, and cutting a release consumes it. Entries state what changed and stop, with every
+identifier backticked. The maintainer pushes and tags releases.
