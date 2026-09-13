@@ -234,7 +234,7 @@ $page->hasMore;
 **The list you see is the one your API key can see.** Suppression is scoped per subaccount,
 and a subaccount key is bound to its own. An address suppressed under a different subaccount
 is not visible to it. To work with a particular subaccount's list, use a key belonging to it;
-[`sendingDomains()->forAddress()`](#sending-domains-and-finding-the-subaccount) reports which
+[`sendingDomains()->forAddress()`](#sending-domains) reports which
 subaccount an address belongs to.
 
 Adding one is a `PUT`, and therefore an upsert — an address already listed has its entry
@@ -254,7 +254,7 @@ varied by a factor of two. `add()` returning true means SparkPost accepted the w
 Whether an unsubscribe in your application also goes on SparkPost's list is your policy, not
 this package's.
 
-## Sending domains, and finding the subaccount
+## Sending domains
 
 Read-only; the key needs only the read grant.
 
@@ -282,10 +282,10 @@ $domain?->hasSubaccount();   // false for the primary account, which is 0 or abs
 without making a request for something that is not an address. `find($domain)` returns `null`
 for a domain the account does not have.
 
-## HTTP 200 does not mean the mail was sent
+## Send results
 
-SparkPost returns `200` having accepted zero recipients. `TransmissionResult` reports what was
-actually taken:
+**HTTP 200 does not mean the mail was sent.** SparkPost returns `200` having accepted zero
+recipients. `TransmissionResult` reports what was actually taken:
 
 ```php
 if (! $result->wasAccepted()) {
@@ -328,7 +328,7 @@ try {
 }
 ```
 
-## Bringing your own HTTP client
+## HTTP clients
 
 Any PSR-18 client works. An application with its own HTTP stack — one routing every outbound
 request through a configurable proxy, with SSRF protections applied on the way out — supplies
@@ -336,7 +336,7 @@ an adapter implementing `sendRequest()` over it.
 
 The test suite uses the same seam and makes no network calls.
 
-## Endpoints not yet wrapped
+## Other endpoints
 
 `$sparkpost->connection()` exposes `get()` and `post()` directly:
 
