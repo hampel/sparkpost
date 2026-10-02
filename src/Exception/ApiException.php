@@ -11,6 +11,9 @@ use Psr\Http\Message\ResponseInterface;
  */
 abstract class ApiException extends SparkPostException
 {
+    /** How much of an unparseable body the message may quote; see summarise(). */
+    private const DETAIL_LENGTH = 200;
+
     /**
      * @param  list<array<string, mixed>>  $errors  the API's own errors[], decoded
      * @param  string  $body  the raw response body, for when it was not JSON at all
@@ -40,7 +43,7 @@ abstract class ApiException extends SparkPostException
 
         $detail = $errors !== []
             ? self::describe($errors)
-            : trim($body);
+            : self::summarise($body);
 
         $message = sprintf(
             'SparkPost rejected %s %s (HTTP %d)%s',
@@ -57,6 +60,24 @@ abstract class ApiException extends SparkPostException
             $status >= 500 => new ServerException($message, $status, $errors, $body, $retryAfter),
             default => new ClientException($message, $status, $errors, $body, $retryAfter),
         };
+    }
+
+    /**
+     * A body that did not parse, trimmed to a length an exception message can carry.
+     *
+     * The whole body stays on $body, where a caller that wants it knows what it is asking
+     * for. The message is the part that gets logged by anything catching this and writing
+     * `['exception' => $e]`, and the body is of unknown origin and unknown size - an error
+     * page from whatever answered. A first line is enough to tell a gateway failure from a
+     * SparkPost refusal; the rest is of no use in a log and may be of no use anywhere.
+     */
+    private static function summarise(string $body): string
+    {
+        $body = trim($body);
+
+        return strlen($body) > self::DETAIL_LENGTH
+            ? substr($body, 0, self::DETAIL_LENGTH) . '...'
+            : $body;
     }
 
     /**

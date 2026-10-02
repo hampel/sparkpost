@@ -60,8 +60,17 @@ $factory   = new HttpFactory();   // PSR-17, fills both the request and stream r
 $sparkpost = new SparkPost(new Config('MY-API-KEY'), new Client(), $factory, $factory);
 ```
 
-A PSR-3 logger is optional and takes a fifth argument. Requests are logged at `debug`,
-failures at `error`; attachment payloads are truncated before they reach the log.
+A PSR-3 logger is optional and takes a fifth argument. Requests are logged at `debug` and
+failures at `error`.
+
+**No log line carries the message.** A transmission is described — campaign, template,
+recipient count, recipient addresses, attachment counts, whether substitution data was
+present — and never quoted, so the subject, the HTML and text bodies, the headers and the
+substitution data do not reach the log at any level. Recipient addresses are the one piece
+of personal data kept, because tracing a delivery complaint needs them; the list is capped
+at ten, and `recipient_count` is always the true number. An error response is logged with
+its status and SparkPost's own `errors[]`, plus the length and content type of the body
+rather than the body itself.
 
 ## Building a transmission
 

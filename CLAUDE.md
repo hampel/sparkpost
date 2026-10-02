@@ -157,6 +157,56 @@ success and ignored the body, so a rejected send looked identical to a delivered
 whether that counts as failure is the caller's policy. `hampel/sparkpost-transport` is where
 `wasAccepted() === false` becomes a thrown `TransportException`.
 
+## No log line carries the message, at any level
+
+**A transmission is made of the things that must never be logged, so the log describes one
+rather than quoting it.** The subject and both bodies are the message; `substitution_data` is
+whatever the caller put there, which may be a token; `headers` is open-ended. An email body is
+also where a password-reset or confirmation link lives, and such a link does for whoever reads
+the log what a password would.
+
+`Transmissions::describe()` is the whole of what may be logged about a send, and the rule it
+exists to enforce is the one worth restating here:
+
+- **`debug` is not an exemption.** A development database is usually a copy of production, and a
+  timed `debug` trial on a live site writes to a store that keeps the lines for months.
+- **Never log a payload or a response body wholesale**, however convenient the spread is. The
+  contents are decided elsewhere, so the next field added to the API gets logged without anyone
+  choosing that it should be. Name the keys.
+- **Recipient addresses stay, and they are the only personal data any line carries.** For a mail
+  transport, which recipient a transmission went to is the whole of answering "they say it never
+  arrived". The list is capped at ten; `recipient_count` stays truthful.
+- **The error path matters more than anything at `debug`**, because production runs at `info`, so
+  an `error` record is always written, and the handler that emails them is floored there too.
+  `Connection` logs the status and SparkPost's parsed `errors[]`, taken from the exception so the
+  log and the caller cannot disagree, plus the body's length and content type. A proxy or gateway
+  in front of the API answers with HTML, and that body is of unknown origin and unbounded size.
+- **`ApiException`'s message quotes at most 200 characters of a body that would not parse.** The
+  whole body stays on `$body`, where a caller asking for it knows what it is asking for; the
+  message is what gets written by anything logging `['exception' => $e]`.
+
+**A consumer cannot fix this from outside.** Some have one log level for the whole application,
+so they cannot raise a channel for one component without raising every other; and filtering in a
+processor or formatter is the wrong place, because only the code holding a value knows whether it
+is an identifier or a secret. That code is here.
+
+### The record
+
+**On 2026-10-01 a consumer ran at `debug` for an hour** to diagnose something unrelated, and this
+package logged every outgoing email for that hour — full HTML body, measured at 12,222
+characters, plus the text body, the subject and the recipients — into a store with 90-day
+retention and no authentication of its own. Fixed in 1.1.1.
+
+Two things made it survive review for six releases, and both are worth knowing:
+
+- **The helper was called `redact()` and did not redact.** It truncated attachment data over 100
+  characters, reasoning entirely about volume, which is a sound thing to do under a name that
+  tells an auditor the disclosure question has been handled. It is `describe()` now, named for
+  what it does.
+- **A test pinned the defect.** `test_a_transmission_without_attachments_passes_through_the_log_untouched`
+  asserted that the subject and text body reached the log verbatim, so the suite would have
+  failed had anyone fixed it. It is now `test_no_part_of_the_message_reaches_the_log`.
+
 ## A message-events cursor is a string, so a queue job can keep its place
 
 Paging is the substance of this resource, not a detail of it, because the two callers are

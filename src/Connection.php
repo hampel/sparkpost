@@ -125,16 +125,26 @@ final class Connection
             return $decoded ?? [];
         }
 
-        // Be defensive about the body: SparkPost is not the only thing that can answer on
-        // this URL, and a proxy or gateway in front of it will return HTML.
+        $exception = ApiException::fromResponse($method, $uri, $response, $decoded, $body);
+
+        // The body itself does not go in the log, and this is the line where that matters
+        // most: production runs at info, so an error record is always written, and the
+        // handler that emails them is floored at error too. SparkPost is also not the only
+        // thing that can answer on this URL - a proxy or gateway in front of it returns
+        // HTML - so the body's size and content type are the useful facts about it, while
+        // its contents are decided by whoever answered. The parsed errors[] is what carries
+        // the reason, and it is taken from the exception so the log and the caller cannot
+        // disagree about it.
         $this->logger->error('SparkPost error response', [
             'method' => $method,
             'uri' => $uri,
             'status' => $status,
-            'body' => $decoded ?? $body,
+            'errors' => $exception->errors,
+            'body_length' => strlen($body),
+            'content_type' => $response->getHeaderLine('Content-Type'),
         ]);
 
-        throw ApiException::fromResponse($method, $uri, $response, $decoded, $body);
+        throw $exception;
     }
 
     /**

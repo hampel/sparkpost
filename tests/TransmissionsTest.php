@@ -162,67 +162,124 @@ final class TransmissionsTest extends TestCase
             $this->assertInstanceOf(ExceptionInterface::class, $e);
         }
     }
-    public function test_it_truncates_attachment_payloads_before_they_reach_the_log(): void
+    /**
+     * The log line that used to carry the payload. These assertions are the fix: a
+     * transmission is made of content that must never be logged at any level, so the line
+     * describes the send instead of reproducing it.
+     */
+    public function test_no_part_of_the_message_reaches_the_log(): void
     {
         $this->client->pushJson(200, self::ACCEPTED);
 
         $logger = new RecordingLogger();
-        $payload = str_repeat('A', 500);
 
         $this->sparkpost(null, $logger)->transmissions()->send([
             'content' => [
-                'attachments' => [['name' => 'invoice.pdf', 'type' => 'application/pdf', 'data' => $payload]],
-                'inline_images' => [['name' => '0', 'type' => 'image/png', 'data' => $payload]],
+                'subject' => 'Reset your password',
+                'html' => '<p>Click https://forum.example.com/reset?token=abc123</p>',
+                'text' => 'Click https://forum.example.com/reset?token=abc123',
+                'headers' => ['X-Whatever' => 'something'],
+                'attachments' => [['name' => 'invoice.pdf', 'type' => 'application/pdf', 'data' => str_repeat('A', 500)]],
+                'inline_images' => [['name' => '0', 'type' => 'image/png', 'data' => str_repeat('B', 500)]],
             ],
+            'substitution_data' => ['reset_token' => 'abc123'],
         ]);
+
+        $everything = json_encode($logger->records, JSON_THROW_ON_ERROR);
+
+        $this->assertStringNotContainsString('Reset your password', $everything);
+        $this->assertStringNotContainsString('abc123', $everything);
+        $this->assertStringNotContainsString('X-Whatever', $everything);
+        $this->assertStringNotContainsString(str_repeat('A', 100), $everything);
+        $this->assertStringNotContainsString(str_repeat('B', 100), $everything);
+    }
+
+    public function test_the_log_describes_the_transmission_it_will_not_quote(): void
+    {
+        $this->client->pushJson(200, self::ACCEPTED);
+
+        $logger = new RecordingLogger();
+
+        $this->sparkpost(null, $logger)->transmissions()->send([
+            'campaign_id' => 'invoices',
+            'options' => ['transactional' => true],
+            'recipients' => [['address' => ['email' => 'alice@example.com', 'header_to' => 'alice@example.com']]],
+            'content' => [
+                'subject' => 'Your invoice',
+                'attachments' => [['name' => 'invoice.pdf', 'data' => 'AAAA']],
+            ],
+            'substitution_data' => ['first_name' => 'Alice'],
+        ]);
+
+        $this->assertSame([
+            'campaign_id' => 'invoices',
+            'template_id' => null,
+            'recipient_count' => 1,
+            'recipients' => ['alice@example.com'],
+            'transactional' => true,
+            'sandbox' => null,
+            'attachment_count' => 1,
+            'inline_image_count' => 0,
+            'has_substitution_data' => true,
+            'return_path' => null,
+        ], $logger->contextFor('SparkPost transmission'));
+    }
+
+    /**
+     * Addresses are the one piece of personal data the line keeps, because tracing a
+     * delivery complaint is what it is for. The cap is what stops a bulk send putting
+     * thousands of them on one line, and the count stays truthful.
+     */
+    public function test_recipient_addresses_are_kept_but_capped(): void
+    {
+        $this->client->pushJson(200, self::ACCEPTED);
+
+        $logger = new RecordingLogger();
+        $recipients = [];
+
+        for ($i = 0; $i < 25; $i++) {
+            $recipients[] = ['address' => ['email' => "user{$i}@example.com"]];
+        }
+
+        $this->sparkpost(null, $logger)->transmissions()->send(['recipients' => $recipients]);
 
         $logged = $logger->contextFor('SparkPost transmission');
 
-        $this->assertSame('<<<truncated>>>', self::path($logged, 'content.attachments.0.data'));
-        $this->assertSame('<<<truncated>>>', self::path($logged, 'content.inline_images.0.data'));
-        // the rest of the entry survives - the log should still show an attachment was there
-        $this->assertSame('invoice.pdf', self::path($logged, 'content.attachments.0.name'));
-        $this->assertSame('application/pdf', self::path($logged, 'content.attachments.0.type'));
+        $this->assertSame(25, self::path($logged, 'recipient_count'));
+        $this->assertCount(10, self::arrayAt($logged, 'recipients'));
+        $this->assertSame('user0@example.com', self::path($logged, 'recipients.0'));
     }
 
-    public function test_truncating_for_the_log_does_not_change_what_is_sent(): void
+    public function test_describing_for_the_log_does_not_change_what_is_sent(): void
     {
         $this->client->pushJson(200, self::ACCEPTED);
 
         $payload = str_repeat('A', 500);
 
         $this->sparkpost()->transmissions()->send([
-            'content' => ['attachments' => [['name' => 'invoice.pdf', 'data' => $payload]]],
+            'content' => ['subject' => 'Hi', 'attachments' => [['name' => 'invoice.pdf', 'data' => $payload]]],
         ]);
 
         $this->assertSame($payload, self::path($this->sentBody(), 'content.attachments.0.data'));
+        $this->assertSame('Hi', self::path($this->sentBody(), 'content.subject'));
     }
 
-    public function test_a_short_payload_is_left_alone(): void
+    /**
+     * The counts an operator actually wants, and nothing in them is personal or unbounded.
+     */
+    public function test_the_result_is_logged(): void
     {
         $this->client->pushJson(200, self::ACCEPTED);
 
         $logger = new RecordingLogger();
 
-        $this->sparkpost(null, $logger)->transmissions()->send([
-            'content' => ['attachments' => [['name' => 'note.txt', 'data' => 'c2hvcnQ=']]],
-        ]);
+        $this->sparkpost(null, $logger)->transmissions()->send([]);
 
-        $logged = $logger->contextFor('SparkPost transmission');
-
-        $this->assertSame('c2hvcnQ=', self::path($logged, 'content.attachments.0.data'));
-    }
-
-    public function test_a_transmission_without_attachments_passes_through_the_log_untouched(): void
-    {
-        $this->client->pushJson(200, self::ACCEPTED);
-
-        $logger = new RecordingLogger();
-        $transmission = ['content' => ['subject' => 'Hi', 'text' => 'Body']];
-
-        $this->sparkpost(null, $logger)->transmissions()->send($transmission);
-
-        $this->assertSame($transmission, $logger->contextFor('SparkPost transmission'));
+        $this->assertSame([
+            'transmission_id' => '11668787484950529',
+            'total_accepted_recipients' => 2,
+            'total_rejected_recipients' => 0,
+        ], $logger->contextFor('SparkPost transmission sent'));
     }
 
     public function test_an_api_error_is_logged_without_the_api_key(): void
@@ -239,6 +296,75 @@ final class TransmissionsTest extends TestCase
 
         $this->assertNotNull($logger->contextFor('SparkPost error response'));
         $this->assertStringNotContainsString('super-secret-key', json_encode($logger->records, JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * This record is written in production - error is always above the threshold, and the
+     * handler that emails them is floored there too - so what it carries matters more than
+     * anything at debug. The reason comes from the parsed errors[]; the body is described
+     * rather than quoted, because whatever answered decided its contents.
+     */
+    public function test_an_error_response_is_logged_without_its_body(): void
+    {
+        $body = '<html><body>Bad Gateway: upstream said ' . str_repeat('x', 400) . '</body></html>';
+
+        $this->client->pushRaw(502, $body);
+
+        $logger = new RecordingLogger();
+
+        try {
+            $this->sparkpost(null, $logger)->transmissions()->send([]);
+            $this->fail('Expected a ServerException.');
+        } catch (ServerException) {
+            // expected
+        }
+
+        $logged = $logger->contextFor('SparkPost error response');
+
+        $this->assertSame(502, self::path($logged, 'status'));
+        $this->assertSame([], self::arrayAt($logged, 'errors'));
+        $this->assertSame(strlen($body), self::path($logged, 'body_length'));
+        $this->assertArrayNotHasKey('body', (array) $logged);
+        $this->assertStringNotContainsString(str_repeat('x', 100), json_encode($logger->records, JSON_THROW_ON_ERROR));
+    }
+
+    public function test_the_parsed_errors_are_what_the_log_carries(): void
+    {
+        $this->client->pushJson(422, ['errors' => [['message' => 'nope', 'code' => '1902']]]);
+
+        $logger = new RecordingLogger();
+
+        try {
+            $this->sparkpost(null, $logger)->transmissions()->send([]);
+        } catch (ClientException) {
+            // expected
+        }
+
+        $logged = $logger->contextFor('SparkPost error response');
+
+        $this->assertSame('nope', self::path($logged, 'errors.0.message'));
+        $this->assertSame('1902', self::path($logged, 'errors.0.code'));
+    }
+
+    /**
+     * The message is what a caller writing ['exception' => $e] puts in the log, so the
+     * unparseable body it quotes is capped. The whole body stays on $body.
+     */
+    public function test_an_unparseable_body_is_capped_in_the_message_and_whole_on_the_exception(): void
+    {
+        $body = '<html><body>Bad Gateway ' . str_repeat('x', 400) . '</body></html>';
+
+        $this->client->pushRaw(502, $body);
+
+        try {
+            $this->sparkpost()->transmissions()->send([]);
+            $this->fail('Expected a ServerException.');
+        } catch (ServerException $e) {
+            $this->assertStringContainsString('Bad Gateway', $e->getMessage());
+            $this->assertStringEndsWith('...', $e->getMessage());
+            $this->assertLessThan(300, strlen($e->getMessage()));
+            $this->assertSame($body, $e->body);
+        }
     }
     /**
      * The other side of the PSR-18 seam: this one is caught before the network, so it is

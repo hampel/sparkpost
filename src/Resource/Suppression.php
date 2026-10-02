@@ -137,7 +137,13 @@ final class Suppression
             $payload['description'] = $description;
         }
 
-        $this->logger->debug('SparkPost suppression add', ['recipient' => $recipient] + $payload);
+        // Named keys rather than the payload: `description` is free text the caller chose,
+        // and spreading the payload would log whatever field this method grows next.
+        $this->logger->debug('SparkPost suppression add', [
+            'recipient' => $recipient,
+            'transactional' => $transactional,
+            'has_description' => $description !== '',
+        ]);
 
         $this->connection->put('suppression-list/' . rawurlencode($recipient), $payload);
 

@@ -15,6 +15,9 @@ use Psr\Log\NullLogger;
  */
 final class Transmissions
 {
+    /** How many recipient addresses one log line may carry; see describe(). */
+    private const RECIPIENTS_LOGGED = 10;
+
     public function __construct(
         private readonly Connection $connection,
         private readonly LoggerInterface $logger = new NullLogger(),
@@ -34,46 +37,83 @@ final class Transmissions
     {
         $transmission = $transmission instanceof Transmission ? $transmission->toArray() : $transmission;
 
-        $this->logger->debug('SparkPost transmission', self::redact($transmission));
+        $this->logger->debug('SparkPost transmission', self::describe($transmission));
 
-        return TransmissionResult::fromResponse($this->connection->post('transmissions', $transmission));
+        $result = TransmissionResult::fromResponse($this->connection->post('transmissions', $transmission));
+
+        $this->logger->debug('SparkPost transmission sent', [
+            'transmission_id' => $result->id,
+            'total_accepted_recipients' => $result->totalAcceptedRecipients,
+            'total_rejected_recipients' => $result->totalRejectedRecipients,
+        ]);
+
+        return $result;
     }
 
     /**
-     * Attachments are base64 in the payload. Left alone they turn a debug log into
-     * megabytes of noise, so truncate them on the way past - the log wants to show that
-     * an attachment was there, not what was in it.
+     * What the log may carry about a transmission, which is deliberately not the payload.
+     *
+     * **A transmission is made of the things that must never be logged, at any level.** The
+     * subject and both message bodies are the message; `substitution_data` is whatever the
+     * caller put there, which may be a token; `headers` is open-ended. An email body is also
+     * where a password-reset or confirmation link lives, and such a link does for whoever
+     * reads the log what a password would. `debug` is not an exemption from that - a
+     * development database is usually a copy of production, and a timed trial on a live site
+     * writes to a store that keeps the lines for months.
+     *
+     * So the log gets a description of the transmission: enough to tell which send a line
+     * belongs to and what shape it was, and nothing that says what it said. Logging a
+     * payload wholesale is the specific habit this avoids, because the next field added to
+     * the API would then be logged without anyone deciding that it should be.
+     *
+     * **Recipient addresses stay**, and they are the one piece of personal data here. For a
+     * mail transport, which recipient a transmission went to is the whole of answering "this
+     * person says they never got it", and the address is the only handle on that this package
+     * has. The list is capped because a bulk send would otherwise put thousands on one line;
+     * `recipient_count` is always the true number.
      *
      * @param  array<mixed>  $transmission
-     * @return array<mixed>
+     * @return array<string, mixed>
      */
-    private static function redact(array $transmission): array
+    private static function describe(array $transmission): array
     {
-        $content = $transmission['content'] ?? null;
+        $content = self::arrayAt($transmission, 'content');
+        $options = self::arrayAt($transmission, 'options');
+        $recipients = self::arrayAt($transmission, 'recipients');
 
-        if (!is_array($content)) {
-            return $transmission;
-        }
+        $addresses = [];
 
-        foreach (['attachments', 'inline_images'] as $key) {
-            $files = $content[$key] ?? null;
+        foreach ($recipients as $recipient) {
+            $address = is_array($recipient) ? ($recipient['address'] ?? null) : null;
+            $email = is_array($address) ? ($address['email'] ?? null) : $address;
 
-            if (is_array($files)) {
-                $content[$key] = array_map(self::truncate(...), $files);
+            if (is_string($email)) {
+                $addresses[] = $email;
             }
         }
 
-        $transmission['content'] = $content;
-
-        return $transmission;
+        return [
+            'campaign_id' => $transmission['campaign_id'] ?? null,
+            'template_id' => $content['template_id'] ?? null,
+            'recipient_count' => count($recipients),
+            'recipients' => array_slice($addresses, 0, self::RECIPIENTS_LOGGED),
+            'transactional' => $options['transactional'] ?? null,
+            'sandbox' => $options['sandbox'] ?? null,
+            'attachment_count' => count(self::arrayAt($content, 'attachments')),
+            'inline_image_count' => count(self::arrayAt($content, 'inline_images')),
+            'has_substitution_data' => self::arrayAt($transmission, 'substitution_data') !== [],
+            'return_path' => $transmission['return_path'] ?? null,
+        ];
     }
 
-    private static function truncate(mixed $file): mixed
+    /**
+     * @param  array<mixed>  $array
+     * @return array<mixed>
+     */
+    private static function arrayAt(array $array, string $key): array
     {
-        if (is_array($file) && isset($file['data']) && is_string($file['data']) && strlen($file['data']) > 100) {
-            $file['data'] = '<<<truncated>>>';
-        }
+        $value = $array[$key] ?? null;
 
-        return $file;
+        return is_array($value) ? $value : [];
     }
 }
