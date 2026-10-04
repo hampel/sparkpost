@@ -23,6 +23,13 @@ jobs:
       # The corners of the supported range, not the whole matrix: the floor with the
       # oldest dependencies it claims, the floor with current ones, and the ceiling.
       # Everything between fails only when a corner does.
+      #
+      # The --prefer-lowest corner RUNS the suite, which is what makes it the check that
+      # every declared lower bound is honest and not only resolvable. Composer resolving a
+      # floor says nothing about whether the code works there: a dependency declaring an
+      # old php requirement installs onto a new one quite happily and can still be broken
+      # on it. So this corner must keep executing phpunit - if it is ever reduced to a
+      # resolve-only job, the lower bounds in composer.json stop being backed by anything.
       matrix:
         include:
           - { php: '8.3', deps: '--prefer-lowest' }
