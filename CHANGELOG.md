@@ -2,30 +2,19 @@
 
 ## Unreleased
 
-**Transmission content was being logged, and if you have ever run this package at `debug` your
-log store holds the emails it sent.** Up to and including 1.1.0,
-`Transmissions::send()` logged the entire transmission payload at `debug`: the subject, the HTML
-body, the text body, `content.headers`, `substitution_data` and the recipients, all verbatim.
-Only attachment and inline-image `data` was abbreviated, and only above 100 characters. For a
-mail transport that is every outgoing message, password-reset and email-confirmation links
-included. Check whether your own log store has those records and whether they should be purged;
-this release stops new ones being written and cannot remove the old.
-
-- the transmission log line now describes the send instead of reproducing it: `campaign_id`,
-  `template_id`, `recipient_count`, `recipients` (addresses, capped at ten), `transactional`,
-  `sandbox`, `attachment_count`, `inline_image_count`, `has_substitution_data` and `return_path`.
-  No part of the message — subject, bodies, headers, substitution data — is logged at any level
+- the transmission log line describes the send rather than carrying the payload:
+  `campaign_id`, `template_id`, `recipient_count`, `recipients` (capped at ten),
+  `transactional`, `sandbox`, `attachment_count`, `inline_image_count`,
+  `has_substitution_data` and `return_path`. The subject, the HTML and text bodies,
+  `content.headers` and `substitution_data` are no longer logged at any level
 - a transmission's result is logged at `debug`: `transmission_id`,
   `total_accepted_recipients`, `total_rejected_recipients`
-- the `error` record for a failed response no longer carries the response body. It logs
-  `status`, `method`, `uri`, SparkPost's parsed `errors[]`, and the body's `body_length` and
-  `content_type`. This is the record production writes, since `error` is above the usual
-  threshold and is the level that gets emailed
-- `ApiException`'s message quotes at most 200 characters of a body that would not parse, since
-  that message is what a caller logging `['exception' => $e]` writes. The whole body is still on
-  `$body`
-- `Suppression::add()` logs named keys rather than spreading its payload, so the caller's
-  `description` text is no longer logged
+- the `error` record for a failed response logs `status`, `method`, `uri`, the parsed
+  `errors[]`, `body_length` and `content_type`, and no longer the response body
+- `ApiException`'s message quotes at most 200 characters of a body that did not parse.
+  `$body` still carries all of it
+- `Suppression::add()` logs named keys rather than its payload. The caller's `description`
+  is no longer logged
 
 ## 1.1.0 (2026-09-13)
 
