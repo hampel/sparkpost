@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.1 (2026-10-04)
 
 - the transmission log line describes the send rather than carrying the payload:
   `campaign_id`, `template_id`, `recipient_count`, `recipients` (capped at ten),
