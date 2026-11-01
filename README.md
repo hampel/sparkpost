@@ -136,8 +136,10 @@ construct:
 normally, and the failure arrives later as a `generation_failure` event reading
 `substitution value 'name' did not exist or was null`. The message is never delivered.
 
-Escape anything you did not write yourself with `Transmission::escapeTemplateSyntax()`, which
-turns both pairs into SparkPost's escape macros:
+Escape anything you did not write yourself with `Transmission::escapeTemplateSyntax()`. It
+replaces every brace in a run that could open or close an expression with SparkPost's escape
+macros, so a leftover brace cannot join a macro and form a triple. Runs with no doubled brace,
+such as CSS's `{}`, are left alone:
 
 ```php
 $transmission->text('Your post: ' . Transmission::escapeTemplateSyntax($post));
@@ -148,8 +150,9 @@ once: a second pass escapes the macros themselves, and they then render as visib
 
 `Hello {{name.field}}` escaped renders as the literal `Hello {{name.field}}`.
 Measured on 2026-11-01 through SparkPost's content previewer, on text and HTML parts, with
-empty substitution data. Treat the subject the same way. Triple braces (`{{{ }}}`, SparkPost's
-unescaped form) have not yet been checked against the API.
+empty substitution data, for the double-brace macros. Treat the subject the same way. Odd runs
+such as `{{}` or `{{{x}}}` also use the single- and triple-brace macros, and those have not yet
+been checked against the API.
 
 ## Message events
 

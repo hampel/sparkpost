@@ -54,6 +54,20 @@ final class Transmission
      */
     private const SANDBOX_DOMAIN = '@sparkpostbox.com';
 
+    /**
+     * SparkPost's macros that each render as the braces they are named for. The double pair
+     * was checked against the API on 2026-11-01; the single and triple ones are run by the
+     * harness's template exercise.
+     */
+    private const BRACE_MACROS = [
+        '{' => '{{ opening_single_curly() }}',
+        '}' => '{{ closing_single_curly() }}',
+        '{{' => '{{ opening_double_curly() }}',
+        '}}' => '{{ closing_double_curly() }}',
+        '{{{' => '{{ opening_triple_curly() }}',
+        '}}}' => '{{ closing_triple_curly() }}',
+    ];
+
     private ?Address $from = null;
 
     private string $subject = '';
@@ -121,20 +135,73 @@ final class Transmission
      * caller did not write - anything a user typed - is read as template syntax wherever it
      * contains double curly braces. A bare `{{name}}` with no value renders empty and the
      * text disappears; `{{name.field}}` or `{{name[0]}}` fails generation, after the send
-     * has already been accepted. Both pairs become SparkPost's escape macros.
+     * has already been accepted.
      *
-     * One strtr() call, deliberately: replacing `{{` and then `}}` in two passes would also
-     * rewrite the `}}` closing the macro the first pass inserted. Escape a value once - a
-     * second pass escapes the macros themselves, and they render as visible text.
+     * Every run of braces that holds a doubled one is replaced whole, brace for brace, with
+     * SparkPost's macros. Replacing `{{` and `}}` alone is not enough: a brace left over
+     * beside an inserted macro joins it, so `{{}` would become
+     * `{{ opening_double_curly() }}}`, whose `}}}` closes a triple. Covering the whole run
+     * means the characters either side of every macro are never braces. A run with no
+     * doubled brace - CSS's `{}` or `}{` - cannot open an expression and is left alone.
      *
-     * Not HTML escaping. Text placed in html() still needs htmlspecialchars() as well.
+     * Escape a value once - a second pass escapes the macros themselves, and they render as
+     * visible text. Not HTML escaping: text placed in html() still needs htmlspecialchars().
      */
     public static function escapeTemplateSyntax(string $text): string
     {
-        return strtr($text, [
-            '{{' => '{{ opening_double_curly() }}',
-            '}}' => '{{ closing_double_curly() }}',
-        ]);
+        if (!str_contains($text, '{{') && !str_contains($text, '}}')) {
+            return $text;
+        }
+
+        $escaped = '';
+        $length = strlen($text);
+        $at = 0;
+
+        while ($at < $length) {
+            $plain = strcspn($text, '{}', $at);
+            $escaped .= substr($text, $at, $plain);
+            $at += $plain;
+
+            $run = substr($text, $at, strspn($text, '{}', $at));
+            $at += strlen($run);
+
+            $escaped .= str_contains($run, '{{') || str_contains($run, '}}')
+                ? self::escapeBraceRun($run)
+                : $run;
+        }
+
+        return $escaped;
+    }
+
+    /**
+     * A run of braces as macros. Each stretch of one brace character becomes doubles, led by
+     * a triple when its length is odd, or the single macro when it is one brace long.
+     */
+    private static function escapeBraceRun(string $run): string
+    {
+        $escaped = '';
+        $at = 0;
+
+        while ($at < strlen($run)) {
+            $brace = $run[$at];
+            $count = strspn($run, $brace, $at);
+            $at += $count;
+
+            if ($count === 1) {
+                $escaped .= self::BRACE_MACROS[$brace];
+
+                continue;
+            }
+
+            if ($count % 2 === 1) {
+                $escaped .= self::BRACE_MACROS[$brace . $brace . $brace];
+                $count -= 3;
+            }
+
+            $escaped .= str_repeat(self::BRACE_MACROS[$brace . $brace], intdiv($count, 2));
+        }
+
+        return $escaped;
     }
 
     public function from(string $email, string $name = ''): self

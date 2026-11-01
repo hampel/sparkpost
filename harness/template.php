@@ -23,18 +23,16 @@
  *   B  {{contact.name}}             does a member of a missing value fail?
  *   C  {{each contact}}x{{end}}     does iterating a missing value fail?
  *   D  {{contact[0]}}               does an index into a missing value fail?
- *   E  the escape macros            does {{ opening_double_curly() }}contact.name
- *                                   {{ closing_double_curly() }} render as the literal
- *                                   text {{contact.name}}? If so it is a viable fix for
- *                                   escaping user content.
- *   F  triple braces, escaped       Transmission::escapeTemplateSyntax() on
- *                                   {{{contact.name}}} leaves a lone brace beside each
- *                                   macro. Does it render literally, or does the engine
- *                                   read the leftover brace as part of a tag?
+ *   E-I  escaped user text          Transmission::escapeTemplateSyntax() on
+ *                                   {{contact.name}}, {{{contact.name}}}, {{}, {}} and
+ *                                   x}}}. Does each render as exactly the text it was
+ *                                   given? The last four need the single and triple
+ *                                   macros as well as the double pair, and leave no
+ *                                   literal brace beside a macro to join it.
  *
- * E and F are both built by Transmission::escapeTemplateSyntax(), so a run also checks the
- * package's helper against the real engine. Answers from 2026-11-01 for A-E are in the
- * README.
+ * Answers from 2026-11-01 for A-E are in the README. E-I are built by the package's own
+ * helper, so a run checks it against the real engine; each prints the line it should render
+ * beside the line it did.
  *
  * A control with no template syntax runs first. If it fails, the endpoint itself refused
  * the request - a field it requires, a key without the grant - and nothing after it would
@@ -71,15 +69,19 @@ $io->value('mode', 'preview only - nothing is sent, no message or event is creat
 $sparkpost = SparkPost::withKey($key, new Client(), getenv('SPARKPOST_REGION') ?: null);
 $from = getenv('SPARKPOST_FROM') ?: 'preview@example.com';
 
+// Case => [what is shown, what is sent, what it should render or null]. A null means the
+// question is open; an escaped case should render exactly the text it was given.
 $cases = [
-    'control' => 'world',
-    'A' => '{{contact}}',
-    'B' => '{{contact.name}}',
-    'C' => '{{each contact}}x{{end}}',
-    'D' => '{{contact[0]}}',
-    'E' => Transmission::escapeTemplateSyntax('{{contact.name}}'),
-    'F' => Transmission::escapeTemplateSyntax('{{{contact.name}}}'),
+    'control' => ['world', 'world', null],
+    'A' => ['{{contact}}', '{{contact}}', null],
+    'B' => ['{{contact.name}}', '{{contact.name}}', null],
+    'C' => ['{{each contact}}x{{end}}', '{{each contact}}x{{end}}', null],
+    'D' => ['{{contact[0]}}', '{{contact[0]}}', null],
 ];
+
+foreach (['E' => '{{contact.name}}', 'F' => '{{{contact.name}}}', 'G' => '{{}', 'H' => '{}}', 'I' => 'x}}}'] as $case => $text) {
+    $cases[$case] = ['escaped ' . $text, Transmission::escapeTemplateSyntax($text), $text];
+}
 
 // The middle line of a rendered part. Io quotes a string value, so an empty substitution
 // shows as the doubled space it leaves - 'Hello  there' - rather than vanishing.
@@ -93,9 +95,9 @@ $middle = static function (mixed $part): string {
 
 $outcomes = [];
 
-foreach ($cases as $case => $construct) {
+foreach ($cases as $case => [$shown, $construct, $literal]) {
     $io->line();
-    $io->info(sprintf('%s   %s', $case, $construct));
+    $io->info(sprintf('%s   %s', $case, $shown));
 
     // The failing transmissions had no substitution_data, and the question is what the
     // engine does with a construct that refers to nothing. The previewer will not take the
@@ -155,10 +157,13 @@ foreach ($cases as $case => $construct) {
     $results = is_array($body['results'] ?? null) ? $body['results'] : [];
 
     $io->success('rendered');
-    $io->values([
-        'text, line 2' => $middle($results['text'] ?? null),
-        'html, line 2' => $middle($results['html'] ?? null),
-    ]);
+    $io->values(array_merge(
+        $literal === null ? [] : ['should be' => "Hello {$literal} there"],
+        [
+            'text, line 2' => $middle($results['text'] ?? null),
+            'html, line 2' => $middle($results['html'] ?? null),
+        ]
+    ));
 
     $outcomes[$case] = 'rendered';
 }

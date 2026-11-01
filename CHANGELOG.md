@@ -2,8 +2,8 @@
 
 ## Unreleased
 
-- add `Transmission::escapeTemplateSyntax()`, which turns `{{` and `}}` into SparkPost's
-  `opening_double_curly()` and `closing_double_curly()` macros so text renders literally
+- add `Transmission::escapeTemplateSyntax()`, which replaces each run of braces holding `{{`
+  or `}}` with SparkPost's single-, double- and triple-brace macros so text renders literally
 - README documents that inline content is rendered as a template: a missing `{{name}}` renders
   empty, and `{{name.field}}` or `{{name[0]}}` fails generation after the send is accepted
 

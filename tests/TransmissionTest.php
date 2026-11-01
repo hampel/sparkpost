@@ -298,7 +298,7 @@ final class TransmissionTest extends TestCase
         ], $payload);
     }
 
-    public function test_template_syntax_is_escaped_to_the_two_macros(): void
+    public function test_template_syntax_is_escaped_to_the_double_macros(): void
     {
         $this->assertSame(
             'Hello {{ opening_double_curly() }}contact.name{{ closing_double_curly() }} there',
@@ -306,14 +306,22 @@ final class TransmissionTest extends TestCase
         );
     }
 
-    public function test_escaping_is_one_pass_so_a_macro_is_not_rewritten(): void
+    public function test_a_leftover_brace_gets_its_own_macro_rather_than_joining_one(): void
     {
-        // Two str_replace() passes would turn the macro's own closing braces into a second
-        // macro. Only an exact expected string notices that.
+        // Escaping only the pair turned this into "{{ opening_double_curly() }}}", whose
+        // "}}}" closes a triple.
         $this->assertSame(
-            '{{ opening_double_curly() }}each x{{ closing_double_curly() }}y'
-                . '{{ opening_double_curly() }}end{{ closing_double_curly() }}',
-            Transmission::escapeTemplateSyntax('{{each x}}y{{end}}')
+            '{{ opening_double_curly() }}{{ closing_single_curly() }}',
+            Transmission::escapeTemplateSyntax('{{}')
+        );
+    }
+
+    public function test_an_odd_run_leads_with_a_triple(): void
+    {
+        $this->assertSame(
+            '{{ opening_triple_curly() }}{{ opening_double_curly() }}x'
+                . '{{ closing_triple_curly() }}',
+            Transmission::escapeTemplateSyntax('{{{{{x}}}')
         );
     }
 
@@ -322,5 +330,47 @@ final class TransmissionTest extends TestCase
         $text = 'A { single } brace, a <p>tag</p> & an ampersand';
 
         $this->assertSame($text, Transmission::escapeTemplateSyntax($text));
+    }
+
+    public function test_a_run_with_no_doubled_brace_is_left_alone_beside_one_that_has(): void
+    {
+        $this->assertSame(
+            'p {} q }{ {{ opening_double_curly() }}x',
+            Transmission::escapeTemplateSyntax('p {} q }{ {{x')
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function awkwardBraces(): iterable
+    {
+        foreach (['{{}', '{}}', '{{{x}}}', 'x}}}', '}}}}', '{{{{{{{', '{}{}{{', '}{{}', '{{a}}{{b}}',
+            '{{ opening_double_curly() }}', 'a{b}c{{d}}e', '{{each x}}y{{end}}'] as $input) {
+            yield $input => [$input];
+        }
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('awkwardBraces')]
+    public function test_escaping_round_trips_and_leaves_no_brace_beside_a_macro(string $input): void
+    {
+        $macros = [
+            '{{ opening_single_curly() }}' => '{',
+            '{{ closing_single_curly() }}' => '}',
+            '{{ opening_double_curly() }}' => '{{',
+            '{{ closing_double_curly() }}' => '}}',
+            '{{ opening_triple_curly() }}' => '{{{',
+            '{{ closing_triple_curly() }}' => '}}}',
+        ];
+
+        $escaped = Transmission::escapeTemplateSyntax($input);
+
+        $this->assertSame($input, strtr($escaped, $macros), 'the macros decode to the input');
+
+        $stripped = strtr($escaped, array_fill_keys(array_keys($macros), "\0"));
+
+        $this->assertStringNotContainsString('{{', $stripped);
+        $this->assertStringNotContainsString('}}', $stripped);
+        $this->assertDoesNotMatchRegularExpression('/[{}]\x00|\x00[{}]/', $stripped);
     }
 }
