@@ -17,7 +17,7 @@
  *
  * The suspicion is that user-written text containing {{...}} reached the template engine.
  * But SparkPost documents a missing or null top-level variable as rendering empty, so a
- * plain {{contact}} should not fail. So, with no substitution_data at all:
+ * plain {{contact}} should not fail. So, with substitution_data empty:
  *
  *   A  {{contact}}                  empty, as documented - or the failure?
  *   B  {{contact.name}}             does a member of a missing value fail?
@@ -87,9 +87,13 @@ foreach ($cases as $case => $construct) {
     $io->line();
     $io->info(sprintf('%s   %s', $case, $construct));
 
-    // No substitution_data, deliberately: the failing transmissions had none, and the
-    // question is what the engine does with a construct that refers to nothing.
+    // The failing transmissions had no substitution_data, and the question is what the
+    // engine does with a construct that refers to nothing. The previewer will not take the
+    // field absent - 422, code 1400, 'substitution_data' is required (2026-11-01) - so it
+    // gets an empty object, the nearest it accepts. An object, not [], which would encode
+    // as a JSON array.
     $payload = [
+        'substitution_data' => new stdClass(),
         'content' => [
             'from' => $from,
             'subject' => 'template repro ' . $case,
