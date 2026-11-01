@@ -120,6 +120,38 @@ Transmission::make()->to('alice@example.com')->template('welcome');
 Transmission::make()->to('alice@example.com')->abTest('subject-line');
 ```
 
+### Inline content is a template too, so escape text you did not write
+
+**SparkPost renders every `{{ }}` in `html()` and `text()` through its template language,
+whether or not you send substitution data.** Text a user wrote that happens to contain double
+curly braces is therefore read as template syntax, with two outcomes depending on the
+construct:
+
+| the text contains | with no matching substitution value |
+|---|---|
+| `{{name}}` or `{{each name}}…{{end}}` | renders as empty — the text silently disappears |
+| `{{name.field}}` or `{{name[0]}}` | the whole message fails to generate |
+
+**The second is the costly one, because the send is accepted first.** `send()` returns
+normally, and the failure arrives later as a `generation_failure` event reading
+`substitution value 'name' did not exist or was null`. The message is never delivered.
+
+Escape anything you did not write yourself with SparkPost's two macros. Replace both pairs in one
+`strtr()` call: replacing `{{` and then `}}` one after the other would also rewrite the `}}` at
+the end of the macro just inserted.
+
+```php
+$safe = strtr($userText, [
+    '{{' => '{{ opening_double_curly() }}',
+    '}}' => '{{ closing_double_curly() }}',
+]);
+```
+
+`Hello {{name.field}}` escaped this way renders as the literal `Hello {{name.field}}`.
+Measured on 2026-11-01 through SparkPost's content previewer, on text and HTML parts, with
+empty substitution data. Treat the subject the same way. Triple braces (`{{{ }}}`, SparkPost's
+unescaped form) were not tested.
+
 ## Message events
 
 ```php
