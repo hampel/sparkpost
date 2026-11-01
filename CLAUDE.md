@@ -386,7 +386,7 @@ Namespace is `Hampel\SparkPost\Tests\`, filename suffix `Test.php`.
 
 ## The harness answers what a stub cannot, and delivers nothing by default
 
-`harness/` holds five `hampel/rig` exercises. They are not tests and assert nothing — they exist
+`harness/` holds six `hampel/rig` exercises. They are not tests and assert nothing — they exist
 for the questions a stub structurally cannot answer.
 
 ```bash
@@ -396,8 +396,19 @@ vendor/bin/rig send                  # one real transmission, and what came back
 vendor/bin/rig events                # real paging, real event shapes
 vendor/bin/rig suppression           # the links shape and the 404; writes are opt-in
 vendor/bin/rig domains               # sending domains, and the subaccount derived from one
+vendor/bin/rig template              # template-language constructs, rendered - sends nothing
 vendor/bin/rig errors                # needs no key - every call here is meant to fail
 ```
+
+**`template` answers what the template engine does with a construct, without a send.** It posts
+inline content to `utils/content-previewer`, which renders through the same engine a transmission
+uses and returns the result, so no message, event or sandbox allowance is spent. A control with no
+template syntax runs first and stops the run if it fails, since then the endpoint has refused the
+request itself and nothing after it says anything about the template language. What it cannot say
+is that the previewer and generation agree — a construct that renders here could still fail when a
+real transmission is generated, and settling that is a send to sink recipients, decided
+separately. It was written for a consumer's generation failures on inline content with no
+substitution data, and the docblock keeps the questions it was asked.
 
 `harness/lib/` is not scanned: rig discovers exercises with `glob('harness/*.php')`, top level
 only, so a shared helper goes one directory down and is `require`d by the exercises that use it.
