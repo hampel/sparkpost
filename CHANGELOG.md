@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- add `Transmission::escapeTemplateSyntax()`, which turns `{{` and `}}` into SparkPost's
+  `opening_double_curly()` and `closing_double_curly()` macros so text renders literally
+- README documents that inline content is rendered as a template: a missing `{{name}}` renders
+  empty, and `{{name.field}}` or `{{name[0]}}` fails generation after the send is accepted
+
 ## 1.1.1 (2026-10-04)
 
 - the transmission log line describes the send rather than carrying the payload:

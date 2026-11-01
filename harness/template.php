@@ -27,6 +27,14 @@
  *                                   {{ closing_double_curly() }} render as the literal
  *                                   text {{contact.name}}? If so it is a viable fix for
  *                                   escaping user content.
+ *   F  triple braces, escaped       Transmission::escapeTemplateSyntax() on
+ *                                   {{{contact.name}}} leaves a lone brace beside each
+ *                                   macro. Does it render literally, or does the engine
+ *                                   read the leftover brace as part of a tag?
+ *
+ * E and F are both built by Transmission::escapeTemplateSyntax(), so a run also checks the
+ * package's helper against the real engine. Answers from 2026-11-01 for A-E are in the
+ * README.
  *
  * A control with no template syntax runs first. If it fails, the endpoint itself refused
  * the request - a field it requires, a key without the grant - and nothing after it would
@@ -46,6 +54,7 @@ use GuzzleHttp\Client;
 use Hampel\SparkPost\Exception\ApiException;
 use Hampel\SparkPost\Exception\ExceptionInterface;
 use Hampel\SparkPost\SparkPost;
+use Hampel\SparkPost\Transmission\Transmission;
 
 $io->title('sparkpost · template language through the content previewer');
 
@@ -68,7 +77,8 @@ $cases = [
     'B' => '{{contact.name}}',
     'C' => '{{each contact}}x{{end}}',
     'D' => '{{contact[0]}}',
-    'E' => '{{ opening_double_curly() }}contact.name{{ closing_double_curly() }}',
+    'E' => Transmission::escapeTemplateSyntax('{{contact.name}}'),
+    'F' => Transmission::escapeTemplateSyntax('{{{contact.name}}}'),
 ];
 
 // The middle line of a rendered part. Io quotes a string value, so an empty substitution

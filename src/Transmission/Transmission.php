@@ -114,6 +114,29 @@ final class Transmission
         return new self();
     }
 
+    /**
+     * Make text render literally through SparkPost's template language.
+     *
+     * Inline content is a template whether or not substitution data is sent, so text the
+     * caller did not write - anything a user typed - is read as template syntax wherever it
+     * contains double curly braces. A bare `{{name}}` with no value renders empty and the
+     * text disappears; `{{name.field}}` or `{{name[0]}}` fails generation, after the send
+     * has already been accepted. Both pairs become SparkPost's escape macros.
+     *
+     * One strtr() call, deliberately: replacing `{{` and then `}}` in two passes would also
+     * rewrite the `}}` closing the macro the first pass inserted. Escape a value once - a
+     * second pass escapes the macros themselves, and they render as visible text.
+     *
+     * Not HTML escaping. Text placed in html() still needs htmlspecialchars() as well.
+     */
+    public static function escapeTemplateSyntax(string $text): string
+    {
+        return strtr($text, [
+            '{{' => '{{ opening_double_curly() }}',
+            '}}' => '{{ closing_double_curly() }}',
+        ]);
+    }
+
     public function from(string $email, string $name = ''): self
     {
         $this->from = new Address($email, $name);

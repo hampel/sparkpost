@@ -297,4 +297,30 @@ final class TransmissionTest extends TestCase
             ],
         ], $payload);
     }
+
+    public function test_template_syntax_is_escaped_to_the_two_macros(): void
+    {
+        $this->assertSame(
+            'Hello {{ opening_double_curly() }}contact.name{{ closing_double_curly() }} there',
+            Transmission::escapeTemplateSyntax('Hello {{contact.name}} there')
+        );
+    }
+
+    public function test_escaping_is_one_pass_so_a_macro_is_not_rewritten(): void
+    {
+        // Two str_replace() passes would turn the macro's own closing braces into a second
+        // macro. Only an exact expected string notices that.
+        $this->assertSame(
+            '{{ opening_double_curly() }}each x{{ closing_double_curly() }}y'
+                . '{{ opening_double_curly() }}end{{ closing_double_curly() }}',
+            Transmission::escapeTemplateSyntax('{{each x}}y{{end}}')
+        );
+    }
+
+    public function test_text_without_double_braces_is_left_alone(): void
+    {
+        $text = 'A { single } brace, a <p>tag</p> & an ampersand';
+
+        $this->assertSame($text, Transmission::escapeTemplateSyntax($text));
+    }
 }
