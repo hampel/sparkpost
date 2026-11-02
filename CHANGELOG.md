@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 (2026-11-02)
 
 - add `Transmission::escapeTemplateSyntax()`, which replaces each run of braces holding `{{`
   or `}}` with SparkPost's single-, double- and triple-brace macros so text renders literally
