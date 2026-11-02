@@ -148,11 +148,10 @@ $transmission->text('Your post: ' . Transmission::escapeTemplateSyntax($post));
 It is not HTML escaping — text going into `html()` needs `htmlspecialchars()` as well. Escape
 once: a second pass escapes the macros themselves, and they then render as visible text.
 
-`Hello {{name.field}}` escaped renders as the literal `Hello {{name.field}}`.
-Measured on 2026-11-01 through SparkPost's content previewer, on text and HTML parts, with
-empty substitution data, for the double-brace macros. Treat the subject the same way. Odd runs
-such as `{{}` or `{{{x}}}` also use the single- and triple-brace macros, and those have not yet
-been checked against the API.
+Escaped, `Hello {{name.field}}` renders as the literal `Hello {{name.field}}`, and so do the odd
+runs that need the single- and triple-brace macros: `{{{x}}}`, `{{}`, `{}}` and `x}}}`.
+Measured through SparkPost's content previewer on 2026-11-01 and 2026-11-02, on text and HTML
+parts, with empty substitution data. Treat the subject the same way.
 
 ## Message events
 

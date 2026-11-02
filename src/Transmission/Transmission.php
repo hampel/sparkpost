@@ -55,9 +55,8 @@ final class Transmission
     private const SANDBOX_DOMAIN = '@sparkpostbox.com';
 
     /**
-     * SparkPost's macros that each render as the braces they are named for. The double pair
-     * was checked against the API on 2026-11-01; the single and triple ones are run by the
-     * harness's template exercise.
+     * SparkPost's macros that each render as the braces they are named for. All six were
+     * checked against the API through the harness's template exercise, on 2026-11-02.
      */
     private const BRACE_MACROS = [
         '{' => '{{ opening_single_curly() }}',

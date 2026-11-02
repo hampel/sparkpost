@@ -30,9 +30,10 @@
  *                                   macros as well as the double pair, and leave no
  *                                   literal brace beside a macro to join it.
  *
- * Answers from 2026-11-01 for A-E are in the README. E-I are built by the package's own
- * helper, so a run checks it against the real engine; each prints the line it should render
- * beside the line it did.
+ * E-I are built by the package's own helper, so a run checks it against the real engine;
+ * each prints the line it should render beside the line it did. Answered on 2026-11-01 and
+ * 2026-11-02: A and C render empty, B and D fail with the consumer's error, and E-I all
+ * render exactly the text given. The README carries the result.
  *
  * A control with no template syntax runs first. If it fails, the endpoint itself refused
  * the request - a field it requires, a key without the grant - and nothing after it would
@@ -79,7 +80,15 @@ $cases = [
     'D' => ['{{contact[0]}}', '{{contact[0]}}', null],
 ];
 
-foreach (['E' => '{{contact.name}}', 'F' => '{{{contact.name}}}', 'G' => '{{}', 'H' => '{}}', 'I' => 'x}}}'] as $case => $text) {
+$escaped = [
+    'E' => '{{contact.name}}',
+    'F' => '{{{contact.name}}}',
+    'G' => '{{}',
+    'H' => '{}}',
+    'I' => 'x}}}',
+];
+
+foreach ($escaped as $case => $text) {
     $cases[$case] = ['escaped ' . $text, Transmission::escapeTemplateSyntax($text), $text];
 }
 

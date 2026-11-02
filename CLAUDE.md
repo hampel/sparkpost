@@ -408,9 +408,10 @@ request itself and nothing after it says anything about the template language. W
 is that the previewer and generation agree — a construct that renders here could still fail when a
 real transmission is generated, and settling that is a send to sink recipients, decided
 separately. It was written for a consumer's generation failures on inline content with no
-substitution data, and the docblock keeps the questions it was asked. **The answers, from the run
-on 2026-11-01, are in the README** under "Inline content is a template too" — that is a fact a
-consumer needs, so it lives where they read. Re-run the exercise before changing that section.
+substitution data, and the docblock keeps the questions it was asked. **The answers, from the
+runs on 2026-11-01 and 2026-11-02, are in the README** under "Inline content is a template too" —
+that is a fact a consumer needs, so it lives where they read. Re-run the exercise before changing
+that section, or `Transmission::escapeTemplateSyntax()`, which cases E-I run through.
 
 `harness/lib/` is not scanned: rig discovers exercises with `glob('harness/*.php')`, top level
 only, so a shared helper goes one directory down and is `require`d by the exercises that use it.
