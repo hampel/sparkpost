@@ -1,10 +1,12 @@
 # Changelog
 
-## Unreleased
+## 1.2.1 (2026-11-03)
 
 - a display name holding an RFC 5322 special, such as the comma in `Smith, John`, is written as
   a quoted-string in `header_to`, the `CC` header and `reply_to`. Unquoted, a receiver read it
   as two addresses. Names with no specials are unchanged
+- README lists every field measured as templated: the subject, the From, Reply-To and Cc names,
+  the text and HTML bodies and custom header values. Quoting a display name does not protect it
 
 ## 1.2.0 (2026-11-02)
 
