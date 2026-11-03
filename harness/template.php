@@ -36,6 +36,10 @@
  *                                   at all? J shows whether the previewer even returns
  *                                   headers - if it does not, K-M can only answer by
  *                                   failing, and a render says nothing either way.
+ *   N-Q  the same in the subject    likewise, with the construct in the subject line.
+ *   R-U  the same in the From name  likewise, in the display name of the From address.
+ *                                   The address itself is left alone - a From the
+ *                                   account has not configured is refused outright.
  *
  * E-I are built by the package's own helper, so a run checks it against the real engine;
  * each prints the line it should render beside the line it did. Answered on 2026-11-01 and
@@ -81,7 +85,8 @@ $from = getenv('SPARKPOST_FROM') ?: 'preview@example.com';
 
 // Case => [what is shown, what is sent, what it should render or null, where it goes]. A
 // null means the question is open; an escaped case should render exactly the text it was
-// given. A header case puts the construct in PROBE_HEADER and leaves the bodies plain.
+// given. A header, subject or from case puts the construct in that one field and leaves the
+// bodies plain.
 const PROBE_HEADER = 'X-Template-Probe';
 
 $cases = [
@@ -104,15 +109,25 @@ foreach ($escaped as $case => $text) {
     $cases[$case] = ['escaped ' . $text, Transmission::escapeTemplateSyntax($text), $text, 'body'];
 }
 
-$cases['J'] = ['header: world', 'world', 'world', 'header'];
-$cases['K'] = ['header: {{contact}}', '{{contact}}', null, 'header'];
-$cases['L'] = ['header: {{contact.name}}', '{{contact.name}}', null, 'header'];
-$cases['M'] = [
-    'header: escaped {{contact.name}}',
-    Transmission::escapeTemplateSyntax('{{contact.name}}'),
-    '{{contact.name}}',
-    'header',
+// Each field gets the same four: a control that shows whether the previewer returns the
+// field at all, then a bare reference, a member lookup, and the escaped member lookup.
+$fieldCases = [
+    ['world', 'world', 'world'],
+    ['{{contact}}', '{{contact}}', null],
+    ['{{contact.name}}', '{{contact.name}}', null],
+    [
+        'escaped {{contact.name}}',
+        Transmission::escapeTemplateSyntax('{{contact.name}}'),
+        '{{contact.name}}',
+    ],
 ];
+
+foreach (['J' => 'header', 'N' => 'subject', 'R' => 'from name'] as $letter => $field) {
+    foreach ($fieldCases as [$shown, $construct, $literal]) {
+        $cases[$letter] = ["{$field}: {$shown}", $construct, $literal, $field];
+        $letter = str_increment($letter);
+    }
+}
 
 // The middle line of a rendered part. Io quotes a string value, so an empty substitution
 // shows as the doubled space it leaves - 'Hello  there' - rather than vanishing.
@@ -137,18 +152,20 @@ foreach ($cases as $case => [$shown, $construct, $literal, $where]) {
     // as a JSON array.
     $inBody = $where === 'body' ? $construct : 'world';
 
+    $probe = "Hello {$construct} there";
+
     $payload = [
         'substitution_data' => new stdClass(),
         'content' => [
-            'from' => $from,
-            'subject' => 'template repro ' . $case,
+            'from' => $where === 'from name' ? ['email' => $from, 'name' => $probe] : $from,
+            'subject' => $where === 'subject' ? $probe : 'template repro ' . $case,
             'text' => "line one\nHello {$inBody} there\nline three",
             'html' => "<p>line one</p>\n<p>Hello {$inBody} there</p>\n<p>line three</p>",
         ],
     ];
 
     if ($where === 'header') {
-        $payload['content']['headers'] = [PROBE_HEADER => "Hello {$construct} there"];
+        $payload['content']['headers'] = [PROBE_HEADER => $probe];
     }
 
     try {
@@ -195,16 +212,26 @@ foreach ($cases as $case => [$shown, $construct, $literal, $where]) {
 
     $io->success('rendered');
 
-    if ($where === 'header') {
-        // Whether the previewer returns headers at all is part of the question, so say what
+    if ($where !== 'body') {
+        // Whether the previewer returns the field at all is part of the question, so say what
         // came back rather than assuming the shape.
-        $headers = is_array($results['headers'] ?? null) ? $results['headers'] : null;
-        $value = $headers[PROBE_HEADER] ?? null;
+        $returned = $results[match ($where) {
+            'header' => 'headers',
+            'subject' => 'subject',
+            default => 'from',
+        }] ?? null;
+
+        // A header comes back in a map, and a From may come back as an address object.
+        $value = match ($where) {
+            'header' => is_array($returned) ? ($returned[PROBE_HEADER] ?? null) : null,
+            'from name' => is_array($returned) ? ($returned['name'] ?? null) : $returned,
+            default => $returned,
+        };
 
         $io->values(array_merge(
             $literal === null ? [] : ['should be' => "Hello {$literal} there"],
             [
-                'header' => is_string($value) ? $value : '(not returned)',
+                $where => is_string($value) ? $value : '(not returned)',
                 'result keys' => implode(', ', array_map('strval', array_keys($results))),
             ]
         ));
