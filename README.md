@@ -124,8 +124,9 @@ Transmission::make()->to('alice@example.com')->abTest('subject-line');
 
 ### Inline content is a template too, so escape text you did not write
 
-**SparkPost renders every `{{ }}` in the subject, the From name, `html()`, `text()` and
-`header()` values through its template language, whether or not you send substitution data.**
+**SparkPost renders every `{{ }}` in the subject, the From, Reply-To and Cc names, `html()`,
+`text()` and `header()` values through its template language, whether or not you send
+substitution data.** Quoting a display name does not protect it.
 Text a user wrote that happens to contain double curly braces is therefore read as template
 syntax, with two outcomes depending on the construct:
 

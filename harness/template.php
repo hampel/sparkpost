@@ -55,7 +55,9 @@
  * render exactly the text given. On 2026-11-03 J-M showed headers are templated the same
  * way: K rendered empty, L failed with 3001 naming the header, M rendered the literal text.
  * N-Q and R-U, the same day, gave the same pattern for the subject and the From name, with
- * the failure naming the Subject and From headers. The README carries the result.
+ * the failure naming the Subject and From headers. V-Y and Z-AC did the same for Reply-To
+ * and the CC header, naming each; X and AB were sent as quoted names and still failed, so
+ * quoting is no protection. The README carries the result.
  *
  * A control with no template syntax runs first. If it fails, the endpoint itself refused
  * the request - a field it requires, a key without the grant - and nothing after it would
