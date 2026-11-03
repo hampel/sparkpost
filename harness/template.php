@@ -40,6 +40,14 @@
  *   R-U  the same in the From name  likewise, in the display name of the From address.
  *                                   The address itself is left alone - a From the
  *                                   account has not configured is refused outright.
+ *   V-Y  the same in Reply-To       likewise, as the display name in reply_to.
+ *   Z-AC the same in the CC header  likewise, as the display name in content.headers.CC,
+ *                                   which is where the builder puts Cc names. Both are
+ *                                   built with Address::format(), so they carry the
+ *                                   quoting a real send would.
+ *
+ * The To display name cannot be asked here: it lives in each recipient's header_to, and
+ * the previewer takes no recipients. Only a send would answer that.
  *
  * E-I are built by the package's own helper, so a run checks it against the real engine;
  * each prints the line it should render beside the line it did. Answered on 2026-11-01 and
@@ -67,6 +75,7 @@ use GuzzleHttp\Client;
 use Hampel\SparkPost\Exception\ApiException;
 use Hampel\SparkPost\Exception\ExceptionInterface;
 use Hampel\SparkPost\SparkPost;
+use Hampel\SparkPost\Transmission\Address;
 use Hampel\SparkPost\Transmission\Transmission;
 
 $io->title('sparkpost · template language through the content previewer');
@@ -123,7 +132,9 @@ $fieldCases = [
     ],
 ];
 
-foreach (['J' => 'header', 'N' => 'subject', 'R' => 'from name'] as $letter => $field) {
+$fields = ['J' => 'header', 'N' => 'subject', 'R' => 'from name', 'V' => 'reply-to', 'Z' => 'cc header'];
+
+foreach ($fields as $letter => $field) {
     foreach ($fieldCases as [$shown, $construct, $literal]) {
         $cases[$letter] = ["{$field}: {$shown}", $construct, $literal, $field];
         $letter = str_increment($letter);
@@ -155,6 +166,11 @@ foreach ($cases as $case => [$shown, $construct, $literal, $where]) {
 
     $probe = "Hello {$construct} there";
 
+    // Reply-To and CC are address strings, so the probe is a display name there, formatted
+    // the way the builder formats one.
+    $replyTo = (new Address('reply@example.com', $probe))->format();
+    $cc = (new Address('cc@example.com', $probe))->format();
+
     $payload = [
         'substitution_data' => new stdClass(),
         'content' => [
@@ -167,6 +183,14 @@ foreach ($cases as $case => [$shown, $construct, $literal, $where]) {
 
     if ($where === 'header') {
         $payload['content']['headers'] = [PROBE_HEADER => $probe];
+    }
+
+    if ($where === 'reply-to') {
+        $payload['content']['reply_to'] = $replyTo;
+    }
+
+    if ($where === 'cc header') {
+        $payload['content']['headers'] = ['CC' => $cc];
     }
 
     try {
@@ -217,20 +241,29 @@ foreach ($cases as $case => [$shown, $construct, $literal, $where]) {
         // Whether the previewer returns the field at all is part of the question, so say what
         // came back rather than assuming the shape.
         $returned = $results[match ($where) {
-            'header' => 'headers',
+            'header', 'cc header' => 'headers',
             'subject' => 'subject',
+            'reply-to' => 'reply_to',
             default => 'from',
         }] ?? null;
 
         // A header comes back in a map, and a From may come back as an address object.
         $value = match ($where) {
             'header' => is_array($returned) ? ($returned[PROBE_HEADER] ?? null) : null,
+            'cc header' => is_array($returned) ? ($returned['CC'] ?? $returned['Cc'] ?? null) : null,
             'from name' => is_array($returned) ? ($returned['name'] ?? null) : $returned,
             default => $returned,
         };
 
+        $expected = "Hello {$literal} there";
+        $expected = match ($where) {
+            'reply-to' => (new Address('reply@example.com', $expected))->format(),
+            'cc header' => (new Address('cc@example.com', $expected))->format(),
+            default => $expected,
+        };
+
         $io->values(array_merge(
-            $literal === null ? [] : ['should be' => "Hello {$literal} there"],
+            $literal === null ? [] : ['should be' => $expected],
             [
                 $where => is_string($value) ? $value : '(not returned)',
                 'result keys' => implode(', ', array_map('strval', array_keys($results))),
