@@ -106,6 +106,8 @@ Behaviour worth knowing:
   a `To:` line containing only themselves. The builder sets it on every recipient from your
   `to()` list.
 - **Cc is made visible by a `CC` header**, not by the recipient list. Bcc gets no header.
+- **A display name with a comma or other special is quoted**, so `Smith, John` stays one
+  address in the To, Cc and Reply-To lines.
 - **A dozen headers are rejected** if passed in `content.headers`. `header()` drops those
   rather than letting the API reject the whole send.
 - **`false` survives.** An option set to `false` is sent as `false`, not dropped.

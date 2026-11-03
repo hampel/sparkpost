@@ -17,12 +17,25 @@ final class Address
 
     /**
      * RFC 5322 display form: `Alice <alice@example.com>`, or the bare address when there
-     * is no name. This is what SparkPost expects for header_to and reply_to, both of
-     * which are strings rather than structured addresses.
+     * is no name. This is what SparkPost expects for header_to, reply_to and the CC
+     * header, all of which are strings rather than structured addresses.
+     *
+     * A name holding any of RFC 5322's specials is written as a quoted-string, with `\`
+     * and `"` escaped inside it. Unquoted, `Smith, John <x@example.com>` is two addresses
+     * to a receiver - "Smith", and "John" at x@example.com - and a list of them is joined
+     * with the same comma. A name with no specials is left bare, as it always was.
      */
     public function format(): string
     {
-        return $this->name === '' ? $this->email : sprintf('%s <%s>', $this->name, $this->email);
+        if ($this->name === '') {
+            return $this->email;
+        }
+
+        $name = preg_match('/[()<>\[\]:;@\\,."]/', $this->name) === 1
+            ? '"' . addcslashes($this->name, '\\"') . '"'
+            : $this->name;
+
+        return sprintf('%s <%s>', $name, $this->email);
     }
 
     /**

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- a display name holding an RFC 5322 special, such as the comma in `Smith, John`, is written as
+  a quoted-string in `header_to`, the `CC` header and `reply_to`. Unquoted, a receiver read it
+  as two addresses. Names with no specials are unchanged
+
 ## 1.2.0 (2026-11-02)
 
 - add `Transmission::escapeTemplateSyntax()`, which replaces each run of braces holding `{{`

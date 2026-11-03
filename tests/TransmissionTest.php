@@ -373,4 +373,17 @@ final class TransmissionTest extends TestCase
         $this->assertStringNotContainsString('}}', $stripped);
         $this->assertDoesNotMatchRegularExpression('/[{}]\x00|\x00[{}]/', $stripped);
     }
+
+    public function test_a_payload_carries_quoted_names_in_header_to_cc_and_reply_to(): void
+    {
+        $payload = Transmission::make()
+            ->to('x@example.com', 'Smith, John')
+            ->cc('c@example.com', 'Doe, Jane')
+            ->replyTo('r@example.com', 'Help, Desk')
+            ->toArray();
+
+        $this->assertSame('"Smith, John" <x@example.com>', self::path($payload, 'recipients.0.address.header_to'));
+        $this->assertSame('"Doe, Jane" <c@example.com>', self::path($payload, 'content.headers.CC'));
+        $this->assertSame('"Help, Desk" <r@example.com>', self::path($payload, 'content.reply_to'));
+    }
 }

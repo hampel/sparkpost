@@ -36,4 +36,26 @@ final class AddressTest extends TestCase
     {
         $this->assertSame('', Address::formatList([]));
     }
+
+    public function test_a_name_with_a_comma_is_quoted_so_it_stays_one_address(): void
+    {
+        $this->assertSame('"Smith, John" <x@example.com>', (new Address('x@example.com', 'Smith, John'))->format());
+    }
+
+    public function test_a_quote_or_backslash_inside_a_quoted_name_is_escaped(): void
+    {
+        $this->assertSame(
+            '"Jo \\"JJ\\" O\\\\Neil." <jo@example.com>',
+            (new Address('jo@example.com', 'Jo "JJ" O\\Neil.'))->format()
+        );
+    }
+
+    public function test_a_list_of_quoted_names_keeps_its_own_commas(): void
+    {
+        $this->assertSame(
+            '"Smith, John" <x@example.com>, "Doe, Jane" <d@example.com>',
+            Address::formatList([new Address('x@example.com', 'Smith, John'), new Address('d@example.com', 'Doe, Jane')])
+        );
+    }
+
 }
