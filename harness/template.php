@@ -40,7 +40,9 @@
  * E-I are built by the package's own helper, so a run checks it against the real engine;
  * each prints the line it should render beside the line it did. Answered on 2026-11-01 and
  * 2026-11-02: A and C render empty, B and D fail with the consumer's error, and E-I all
- * render exactly the text given. The README carries the result.
+ * render exactly the text given. On 2026-11-03 J-M showed headers are templated the same
+ * way: K rendered empty, L failed with 3001 naming the header, M rendered the literal text.
+ * The README carries the result.
  *
  * A control with no template syntax runs first. If it fails, the endpoint itself refused
  * the request - a field it requires, a key without the grant - and nothing after it would

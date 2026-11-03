@@ -122,8 +122,8 @@ Transmission::make()->to('alice@example.com')->abTest('subject-line');
 
 ### Inline content is a template too, so escape text you did not write
 
-**SparkPost renders every `{{ }}` in `html()` and `text()` through its template language,
-whether or not you send substitution data.** Text a user wrote that happens to contain double
+**SparkPost renders every `{{ }}` in `html()`, `text()` and `header()` values through its
+template language, whether or not you send substitution data.** Text a user wrote that happens to contain double
 curly braces is therefore read as template syntax, with two outcomes depending on the
 construct:
 
@@ -150,8 +150,9 @@ once: a second pass escapes the macros themselves, and they then render as visib
 
 Escaped, `Hello {{name.field}}` renders as the literal `Hello {{name.field}}`, and so do the odd
 runs that need the single- and triple-brace macros: `{{{x}}}`, `{{}`, `{}}` and `x}}}`.
-Measured through SparkPost's content previewer on 2026-11-01 and 2026-11-02, on text and HTML
-parts, with empty substitution data. Treat the subject the same way.
+Measured through SparkPost's content previewer between 2026-11-01 and 2026-11-03, with empty
+substitution data, on the text and HTML parts and on a custom header, which behaves the same
+way. Treat the subject the same way.
 
 ## Message events
 
