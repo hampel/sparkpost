@@ -156,6 +156,12 @@ runs that need the single- and triple-brace macros: `{{{x}}}`, `{{}`, `{}}` and 
 Measured through SparkPost's content previewer between 2026-11-01 and 2026-11-03, with empty
 substitution data, on every field above — each behaves the same way.
 
+**The To names are the exception: do not escape them.** `header_to` is not rendered as a
+template, so an escaped To name arrives with the macros showing — `"{{ opening_double_curly()
+}}x.y{{ closing_double_curly() }}" <…>` — while `{{x.y}}` there generates and delivers, and
+`Before {{x}} After` arrives intact. Measured with real sends on 2026-11-24. A recipient's own
+`name`, sent only when the message has no To and no `deliverTo()`, has not been measured.
+
 ## Message events
 
 ```php

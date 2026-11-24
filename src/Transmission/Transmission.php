@@ -145,6 +145,7 @@ final class Transmission
      *
      * Escape a value once - a second pass escapes the macros themselves, and they render as
      * visible text. Not HTML escaping: text placed in html() still needs htmlspecialchars().
+     * Not for a To name either: header_to is not templated, so the macros would show.
      */
     public static function escapeTemplateSyntax(string $text): string
     {

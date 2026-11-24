@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- README: the To names are not rendered as a template, so escaping one shows the macros in the
+  delivered To: line. A recipient's `name`, sent only with no To, is unmeasured
+
 ## 1.2.1 (2026-11-03)
 
 - a display name holding an RFC 5322 special, such as the comma in `Smith, John`, is written as

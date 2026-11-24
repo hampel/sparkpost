@@ -47,7 +47,9 @@
  *                                   quoting a real send would.
  *
  * The To display name cannot be asked here: it lives in each recipient's header_to, and
- * the previewer takes no recipients. Only a send would answer that.
+ * the previewer takes no recipients. Real sends answered it on 2026-11-24: header_to is not
+ * templated, so {{x.y}} there delivers and an escaped name shows the macros. The README
+ * carries that too.
  *
  * E-I are built by the package's own helper, so a run checks it against the real engine;
  * each prints the line it should render beside the line it did. Answered on 2026-11-01 and
